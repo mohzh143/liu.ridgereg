@@ -1,0 +1,177 @@
+---
+title: "Predictive modeling with ridgereg (BostonHousing)"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Predictive modeling with ridgereg (BostonHousing)}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include=FALSE}
+library(liu.ridgereg)
+library(caret)
+library(dplyr)
+library(mlbench)
+library(MASS)
+set.seed(123)
+```
+
+# Introduction
+
+This vignette demonstrates how to use the **`ridgereg()`** function (implemented in this package) for predictive modeling with the **BostonHousing** dataset from the `mlbench` package.
+
+We compare three models:
+
+1. Ordinary Linear Regression (`lm`)
+2. Stepwise Linear Regression (`stepAIC`)
+3. Ridge Regression (`ridgereg`) with cross-validated λ
+
+---
+
+# Data Preparation
+
+```{r data-prep}
+data("BostonHousing", package = "mlbench")
+
+# Split training/testing sets
+train_index <- createDataPartition(BostonHousing$medv, p = 0.8, list = FALSE)
+train <- BostonHousing[train_index, ]
+test  <- BostonHousing[-train_index, ]
+
+# Features and target
+y_train <- train$medv
+y_test  <- test$medv
+```
+
+---
+
+# 1️⃣ Ordinary Linear Regression
+
+```{r lm-fit}
+lm_model <- lm(medv ~ ., data = train)
+summary(lm_model)
+
+# Prediction and RMSE
+pred_lm <- predict(lm_model, newdata = test)
+rmse_lm <- sqrt(mean((pred_lm - y_test)^2))
+rmse_lm
+```
+
+---
+
+# 2️⃣ Stepwise Linear Regression (Forward Selection)
+
+```{r stepwise}
+step_model <- stepAIC(lm(medv ~ 1, data = train),
+                      scope = list(lower = ~1, upper = ~.),
+                      direction = "forward",
+                      trace = FALSE)
+summary(step_model)
+
+pred_step <- predict(step_model, newdata = test)
+rmse_step <- sqrt(mean((pred_step - y_test)^2))
+rmse_step
+```
+
+---
+
+# 3️⃣ Ridge Regression with Cross-Validation
+
+We test λ = {0.01, 0.1, 1, 10, 100} and use 10-fold CV to find the best λ.
+
+```{r ridge-viz-cv-plot}
+lambdas <- c(0.01, 0.1, 1, 10, 100)
+cv_results <- data.frame(lambda = lambdas, RMSE = NA)
+
+for (i in seq_along(lambdas)) {
+  lambda_val <- lambdas[i]
+  folds <- createFolds(train$medv, k = 10, list = TRUE)
+  fold_rmse <- numeric(length(folds))
+  
+  for (j in seq_along(folds)) {
+    fold_train <- train[-folds[[j]], ]
+    fold_test  <- train[folds[[j]], ]
+    model <- ridgereg(medv ~ ., data = fold_train, lambda = lambda_val)
+    pred  <- predict(model, newdata = fold_test)
+    fold_rmse[j] <- sqrt(mean((pred - fold_test$medv)^2))
+  }
+  cv_results$RMSE[i] <- mean(fold_rmse)
+}
+
+cv_results
+best_lambda <- cv_results$lambda[which.min(cv_results$RMSE)]
+best_lambda
+```
+
+---
+
+# 4️⃣ Final Ridge Model and Evaluation
+
+```{r final-ridge}
+ridge_final <- ridgereg(medv ~ ., data = train, lambda = best_lambda)
+summary(ridge_final)
+
+pred_ridge <- predict(ridge_final, newdata = test)
+rmse_ridge <- sqrt(mean((pred_ridge - y_test)^2))
+rmse_ridge
+```
+
+---
+
+# 📊 Model Comparison
+
+```{r compare}
+compare_df <- data.frame(
+  Model = c("Linear", "Stepwise", "Ridge"),
+  RMSE = c(rmse_lm, rmse_step, rmse_ridge)
+)
+compare_df
+```
+
+---
+
+# 🏁 Conclusion
+
+* The ridge regression model introduces a penalty term that stabilizes coefficient estimates and helps prevent overfitting.
+* Using cross-validation, we select the λ that minimizes test RMSE.
+* Comparing RMSEs, the best-performing model can be identified for this dataset.
+
+---
+
+
+# Ridge Regression Model Visualization
+
+This section provides three visual insights about the ridge regression model's structure and performance.
+
+## 1️⃣ Coefficient Shrinkage Path
+
+```{r ridge-path, fig.width=6, fig.height=4}
+library(glmnet)
+set.seed(42)
+X <- as.matrix(mtcars[, -1])
+y <- mtcars$mpg
+ridge <- glmnet(X, y, alpha = 0)
+plot(ridge, xvar = "lambda", label = TRUE)
+```
+*Interpretation:* As the penalty parameter λ increases, coefficients shrink toward zero, showing the effect of regularization.
+
+## 2️⃣ Cross-Validation Curve
+
+```{r ridge-viz-cv, fig.width=6, fig.height=4}
+cv_ridge <- cv.glmnet(X, y, alpha = 0)
+plot(cv_ridge)
+```
+*Interpretation:* The vertical lines indicate the optimal λ values minimizing the cross-validation error. This helps choose a good tradeoff between bias and variance.
+
+## 3️⃣ Predicted vs Actual Values
+
+```{r ridge-pred, fig.width=6, fig.height=4}
+best_lambda <- cv_ridge$lambda.min
+ridge_best <- glmnet(X, y, alpha = 0, lambda = best_lambda)
+y_pred <- predict(ridge_best, X)
+plot(y, y_pred, pch = 19, col = "steelblue",
+     xlab = "Actual MPG", ylab = "Predicted MPG",
+     main = "Ridge Regression: Actual vs Predicted")
+abline(0, 1, col = "red", lty = 2)
+```
+*Interpretation:* The closer the points are to the red diagonal line, the better the model fits the data.

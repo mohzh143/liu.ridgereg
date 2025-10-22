@@ -1,0 +1,38 @@
+Package: liu.ridgereg
+Type: Package
+Title: An R Implementation of a multiple linear regression model
+Version: 1.0.0
+Authors@R: c(
+    person(given = "Siyuan", family = "Xu", email = "ningschue@gmail.com", role = c("aut", "cre")),
+    person(given = "Mohan", family = "Zhang", email = "mohzh143@student.liu.se", role = c("aut")),
+    person(given = "Chenzhi", family = "Ni", email = "cheni622@student.liu.se", role = c("aut"))
+  )
+Description: This package implements multiple linear regression and ridge regression 
+    using R's S3 object-oriented system. It provides functions for model fitting, 
+    coefficient extraction, prediction, residuals, and performance summaries. 
+    Additional vignettes demonstrate predictive modeling on real-world datasets 
+    such as 'BostonHousing' and 'nycflights13', including visualization of 
+    model performance and interpretation of ridge regularization effects. 
+    Developed as part of the lab assignment for the course 732A94 Advanced R Programming 
+    at Linköping University.
+License: MIT + file LICENSE
+Encoding: UTF-8
+LazyData: true
+Suggests: 
+    caret,
+    mlbench,
+    knitr,
+    rmarkdown,
+    glmnet,
+    MASS,
+    testthat (>= 3.0.0)
+RoxygenNote: 7.3.3
+Config/testthat/edition: 3
+Imports: 
+    ggplot2,
+    quantreg,
+    patchwork,
+    dplyr,
+    nycflights13,
+    stats
+VignetteBuilder: knitr
