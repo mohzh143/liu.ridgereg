@@ -12,7 +12,7 @@ utils::globalVariables(c(
 #' @return A ggplot object showing mean delays by airport.
 #' @import dplyr
 #' @importFrom ggplot2 ggplot aes geom_point scale_size_continuous scale_alpha_continuous labs theme_bw
-#' @importFrom utils globalVariables
+#' @importFrom rlang .data
 #' @export
 #'
 #' @examples
@@ -24,24 +24,26 @@ visualize_airport_delays <- function() {
   flights <- nycflights13::flights
   airports <- nycflights13::airports
 
-  # Compute mean delay
+  # Compute mean delay without global variables
   mean_delay_by_origin <- flights |>
-    dplyr::mutate(delay = dplyr::coalesce(arr_delay, dep_delay)) |>
-    dplyr::filter(!is.na(delay)) |>
-    dplyr::group_by(origin) |>
-    dplyr::summarise(mean_delay = mean(delay), n = dplyr::n(), .groups = "drop")
+    dplyr::mutate(delay = dplyr::coalesce(.data$arr_delay, .data$dep_delay)) |>
+    dplyr::filter(!is.na(.data$delay)) |>
+    dplyr::group_by(.data$origin) |>
+    dplyr::summarise(mean_delay = mean(.data$delay),
+                     n = dplyr::n(),
+                     .groups = "drop")
 
   # Join coordinates
   ap <- airports |>
-    dplyr::select(faa, name, lat, lon)
+    dplyr::select(.data$faa, .data$name, .data$lat, .data$lon)
 
   df <- mean_delay_by_origin |>
     dplyr::left_join(ap, by = c("origin" = "faa")) |>
-    dplyr::filter(!is.na(lat), !is.na(lon))
+    dplyr::filter(!is.na(.data$lat), !is.na(.data$lon))
 
   # Visualization
-  ggplot2::ggplot(df, ggplot2::aes(lon, lat, size = n)) +
-    ggplot2::geom_point(ggplot2::aes(alpha = mean_delay)) +
+  ggplot2::ggplot(df, ggplot2::aes(.data$lon, .data$lat, size = .data$n)) +
+    ggplot2::geom_point(ggplot2::aes(alpha = .data$mean_delay)) +
     ggplot2::scale_size_continuous(name = "Flights") +
     ggplot2::scale_alpha_continuous(name = "Mean delay (min)") +
     ggplot2::labs(

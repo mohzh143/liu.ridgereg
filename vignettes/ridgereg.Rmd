@@ -45,7 +45,7 @@ y_test  <- test$medv
 
 ---
 
-# 1️⃣ Ordinary Linear Regression
+# 1. Ordinary Linear Regression
 
 ```{r lm-fit}
 lm_model <- lm(medv ~ ., data = train)
@@ -59,7 +59,7 @@ rmse_lm
 
 ---
 
-# 2️⃣ Stepwise Linear Regression (Forward Selection)
+# 2. Stepwise Linear Regression (Forward Selection)
 
 ```{r stepwise}
 step_model <- stepAIC(lm(medv ~ 1, data = train),
@@ -75,7 +75,7 @@ rmse_step
 
 ---
 
-# 3️⃣ Ridge Regression with Cross-Validation
+# 3. Ridge Regression with Cross-Validation
 
 We test λ = {0.01, 0.1, 1, 10, 100} and use 10-fold CV to find the best λ.
 
@@ -105,7 +105,7 @@ best_lambda
 
 ---
 
-# 4️⃣ Final Ridge Model and Evaluation
+# 4. Final Ridge Model and Evaluation
 
 ```{r final-ridge}
 ridge_final <- ridgereg(medv ~ ., data = train, lambda = best_lambda)
@@ -118,7 +118,7 @@ rmse_ridge
 
 ---
 
-# 📊 Model Comparison
+# Model Comparison
 
 ```{r compare}
 compare_df <- data.frame(
@@ -130,7 +130,7 @@ compare_df
 
 ---
 
-# 🏁 Conclusion
+# Conclusion
 
 * The ridge regression model introduces a penalty term that stabilizes coefficient estimates and helps prevent overfitting.
 * Using cross-validation, we select the λ that minimizes test RMSE.
@@ -143,7 +143,7 @@ compare_df
 
 This section provides three visual insights about the ridge regression model's structure and performance.
 
-## 1️⃣ Coefficient Shrinkage Path
+## 1. Coefficient Shrinkage Path
 
 ```{r ridge-path, fig.width=6, fig.height=4}
 library(glmnet)
@@ -155,7 +155,7 @@ plot(ridge, xvar = "lambda", label = TRUE)
 ```
 *Interpretation:* As the penalty parameter λ increases, coefficients shrink toward zero, showing the effect of regularization.
 
-## 2️⃣ Cross-Validation Curve
+## 2. Cross-Validation Curve
 
 ```{r ridge-viz-cv, fig.width=6, fig.height=4}
 cv_ridge <- cv.glmnet(X, y, alpha = 0)
@@ -163,7 +163,7 @@ plot(cv_ridge)
 ```
 *Interpretation:* The vertical lines indicate the optimal λ values minimizing the cross-validation error. This helps choose a good tradeoff between bias and variance.
 
-## 3️⃣ Predicted vs Actual Values
+## 3. Predicted vs Actual Values
 
 ```{r ridge-pred, fig.width=6, fig.height=4}
 best_lambda <- cv_ridge$lambda.min

@@ -1,21 +1,21 @@
-# 📦 liu.ridgereg
+# liu.ridgereg
 
 **An R package implementing multiple linear regression and ridge regression using S3 methods**
 
 ---
 
-## 🔍 Overview
+## Overview
 
 The **`liu.ridgereg`** package provides an implementation of multiple linear regression and ridge regression models in R using the **S3 object-oriented system**.  
 It includes generic methods such as `print()`, `summary()`, `coef()`, `pred()`, and `plot()` for model interpretation and visualization.
 
 The package also contains **two vignettes** demonstrating real-world predictive modeling:
-1. ✈️ **Flight delay prediction** using `nycflights13`
-2. 🏠 **Boston housing price prediction** using `BostonHousing` (ridge regression)
+1. **Flight delay prediction** using `nycflights13`
+2. **Boston housing price prediction** using `BostonHousing` (ridge regression)
 
 ---
 
-## ⚙️ Installation
+## Installation
 
 You can install the package from your local development directory:
 
@@ -32,7 +32,7 @@ library(liu.ridgereg)
 
 ---
 
-## 🧩 Main Functions
+## Main Functions
 
 | Function | Description |
 |-----------|-------------|
@@ -46,7 +46,7 @@ library(liu.ridgereg)
 
 ---
 
-## 📖 Example
+## Example
 
 ```r
 library(liu.ridgereg)
@@ -64,7 +64,7 @@ head(pred)
 
 ---
 
-## 📊 Vignettes
+## Vignettes
 
 You can view the example reports after building vignettes:
 
@@ -77,7 +77,7 @@ vignette(package = "liu.ridgereg")
 
 ---
 
-## 🧠 Learning Highlights
+## Learning Highlights
 
 This package was developed as part of the **732A94 Advanced R Programming** course at **Linköping University**.  
 It demonstrates:
@@ -88,7 +88,7 @@ It demonstrates:
 
 ---
 
-## 👨‍💻 Authors
+## Authors
 
 - **Siyuan Xu** – <ningschue@gmail.com>  
 - **Mohan Zhang** – <mohzh143@student.liu.se>  
@@ -96,13 +96,13 @@ It demonstrates:
 
 ---
 
-## 📜 License
+## License
 
 MIT License (see [LICENSE](./LICENSE))
 
 ---
 
-## 📚 Citation
+## Citation
 
 If you use this package in your work, please cite it as:
 
@@ -111,7 +111,7 @@ If you use this package in your work, please cite it as:
 
 ---
 
-## 🧩 See Also
+## See Also
 
 - `?ridgereg` for model documentation  
 - `vignette("ridgereg", package = "liu.ridgereg")` for ridge model example  
@@ -119,21 +119,4 @@ If you use this package in your work, please cite it as:
 
 ---
 
-## 🖼️ Vignette Preview
-
-Below are visual summaries from the two vignettes included in this package.
-
-### ✈️ Flight Delay Visualization
-![Flight Delay Visualization](inst/doc/flight_delay_plot.png)
-*Average flight delays by airport based on `nycflights13` dataset.*
-
----
-
-### 🏠 Ridge Regression Visualization
-![Ridge Coefficient Paths](inst/doc/ridge_coeff_path.png)
-*Coefficient shrinkage path showing the effect of λ in ridge regression.*
-
----
-
-📘 *Developed and tested in R 4.5.1 under Windows 11 with support for `ggplot2`, `caret`, and `mlbench`.*
 

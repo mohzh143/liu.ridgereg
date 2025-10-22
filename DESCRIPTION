@@ -34,5 +34,6 @@ Imports:
     patchwork,
     dplyr,
     nycflights13,
-    stats
+    stats,
+    rlang
 VignetteBuilder: knitr

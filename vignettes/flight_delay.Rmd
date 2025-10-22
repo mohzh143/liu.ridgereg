@@ -52,11 +52,11 @@ The lower the RMSE, the better the predictive performance.
 
 
 
-# Visualizing Flight Delays (Enhanced)
+# Visualizing Flight Delays 
 
 This section adds three detailed visualizations about flight delays using **nycflights13** data.
 
-## 1️⃣ Flight Delay Map
+## 1. Flight Delay Map
 
 ```{r delay-map, fig.width=6, fig.height=4}
 library(ggplot2); library(dplyr); library(nycflights13)
@@ -87,7 +87,7 @@ ggplot(df, aes(lon, lat, size = n, color = mean_delay)) +
 ```
 *Interpretation:* Airports with more flights (larger points) often show higher mean delays (warmer colors).
 
-## 2️⃣ Delay Distribution
+## 2. Delay Distribution
 
 ```{r delay-dist, fig.width=6, fig.height=4}
 ggplot(flights, aes(x = coalesce(arr_delay, dep_delay))) +
@@ -99,7 +99,7 @@ ggplot(flights, aes(x = coalesce(arr_delay, dep_delay))) +
 ```
 *Interpretation:* The majority of flights have small delays, but there are some extreme delay cases forming a long tail.
 
-## 3️⃣ Mean Delay by Airline
+## 3. Mean Delay by Airline
 
 ```{r carrier-delay, fig.width=6, fig.height=4}
 carrier_delay <- flights %>%
