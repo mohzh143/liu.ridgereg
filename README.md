@@ -1,5 +1,7 @@
 # liu.ridgereg
 
+[![R-CMD-check](https://github.com/mohzh143/liu.ridgereg/actions/workflows/R-CMD-check.yaml/badge.svg)](https://github.com/mohzh143/liu.ridgereg/actions/workflows/R-CMD-check.yaml)  
+
 **An R package implementing multiple linear regression and ridge regression using S3 methods**
 
 ---
