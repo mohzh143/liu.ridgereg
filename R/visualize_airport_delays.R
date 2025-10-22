@@ -1,9 +1,3 @@
-# Declare global variables to silence R CMD check NOTE
-utils::globalVariables(c(
-  "arr_delay", "dep_delay", "delay", "origin", "faa", "name",
-  "lat", "lon", "n", "mean_delay"
-))
-
 #' Visualize mean flight delays by airport (nycflights13)
 #'
 #' This function computes and visualizes the mean flight delay
@@ -24,18 +18,21 @@ visualize_airport_delays <- function() {
   flights <- nycflights13::flights
   airports <- nycflights13::airports
 
-  # Compute mean delay without global variables
+  # Compute mean delay safely using rlang::.data
   mean_delay_by_origin <- flights |>
     dplyr::mutate(delay = dplyr::coalesce(.data$arr_delay, .data$dep_delay)) |>
     dplyr::filter(!is.na(.data$delay)) |>
     dplyr::group_by(.data$origin) |>
-    dplyr::summarise(mean_delay = mean(.data$delay),
-                     n = dplyr::n(),
-                     .groups = "drop")
+    dplyr::summarise(
+      mean_delay = mean(.data$delay),
+      n = dplyr::n(),
+      .groups = "drop"
+    )
 
-  # Join coordinates
+  # Join airport coordinates
   ap <- airports |>
-    dplyr::select(.data$faa, .data$name, .data$lat, .data$lon)
+    dplyr::select(faa = .data$faa, name = .data$name,
+                  lat = .data$lat, lon = .data$lon)
 
   df <- mean_delay_by_origin |>
     dplyr::left_join(ap, by = c("origin" = "faa")) |>
