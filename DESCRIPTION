@@ -11,8 +11,8 @@ Description: This package implements multiple linear regression and ridge regres
     using R's S3 object-oriented system. It provides functions for model fitting, 
     coefficient extraction, prediction, residuals, and performance summaries. 
     Additional vignettes demonstrate predictive modeling on real-world datasets 
-    such as 'BostonHousing' and 'nycflights13', including visualization of 
-    model performance and interpretation of ridge regularization effects. 
+    such as 'BostonHousing', including visualization of model performance and 
+    interpretation of ridge regularization effects. 
     Developed as part of the lab assignment for the course 732A94 Advanced R Programming 
     at Linköping University.
 License: MIT + file LICENSE
