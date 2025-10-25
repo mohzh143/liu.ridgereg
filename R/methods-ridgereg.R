@@ -33,7 +33,6 @@ predict.ridgereg <- function(object, newdata = NULL, ...) {
     return(object$fitted)
   }
 
-  # --- [代码检查 newdata 是否与训练数据相同] ---
   call_env <- parent.frame()
   if (!is.null(object$call$data)) {
     train_data <- try(eval(object$call$data, envir = call_env), silent = TRUE)
@@ -45,20 +44,13 @@ predict.ridgereg <- function(object, newdata = NULL, ...) {
       }
     }
   }
-  # --- [结束检查] ---
 
-  # 1. 获取未标准化的模型矩阵
-  #    我们不使用 scale()，因为 object$beta 已经是 rescaled 的系数
   mf <- stats::model.frame(object$terms, data = newdata, na.action = stats::na.omit)
   Xraw <- stats::model.matrix(object$terms, mf, contrasts.arg = NULL)
 
-  # 2. 确保列名和顺序与训练时一致
   common_cols <- intersect(colnames(Xraw), object$coefnames)
   Xraw <- Xraw[, common_cols, drop = FALSE]
 
-  # 3. 直接使用 rescaled 系数 (object$beta) 进行矩阵乘法
-  #    我们不再添加 object$y_mean，因为它已经包含在
-  #    object$beta 的截距项中了。
   yhat <- as.vector(Xraw %*% object$beta[match(colnames(Xraw), object$coefnames)])
 
   return(yhat)

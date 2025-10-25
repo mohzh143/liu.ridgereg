@@ -17,7 +17,6 @@ ridgereg <- function(formula, data, lambda, method = c("normal", "qr")) {
   stopifnot(is.numeric(lambda), length(lambda) == 1, lambda >= 0)
   method <- match.arg(method)
 
-  # setup
   mf   <- stats::model.frame(formula = formula, data = data, na.action = stats::na.omit)
   trm  <- stats::terms(mf)
   Xraw <- stats::model.matrix(trm, mf, contrasts.arg = NULL)  # includes intercept
@@ -26,7 +25,6 @@ ridgereg <- function(formula, data, lambda, method = c("normal", "qr")) {
 
   has_int <- "(Intercept)" %in% colnames(Xraw)
 
-  # center/scale predictors (exclude intercept)
   idx <- seq_len(ncol(Xraw))
   if (has_int) idx <- setdiff(idx, match("(Intercept)", colnames(Xraw)))
 
@@ -48,7 +46,6 @@ ridgereg <- function(formula, data, lambda, method = c("normal", "qr")) {
   n <- nrow(X)
   p <- ncol(X)
 
-  # ridge fit
   if (method == "normal") {
     pen <- diag(p)
     if (has_int) pen[match("(Intercept)", colnames(X)), match("(Intercept)", colnames(X))] <- 0
@@ -67,16 +64,13 @@ ridgereg <- function(formula, data, lambda, method = c("normal", "qr")) {
     beta <- qr.coef(qrZ, z)
   }
 
-  # fitted values (rescaled back to original y scale)
   yhat_centered <- as.vector(X %*% beta)
   yhat <- y_mean + yhat_centered
   resid <- y - yhat
 
-  # residual variance
   df <- n - qr(X)$rank
   sigma2 <- sum(resid^2) / max(1, df)
 
-  # inference
   pen <- diag(p)
   if (has_int) pen[match("(Intercept)", colnames(X)), match("(Intercept)", colnames(X))] <- 0
   XtX <- crossprod(X)
@@ -86,7 +80,6 @@ ridgereg <- function(formula, data, lambda, method = c("normal", "qr")) {
   tval  <- beta / se
   pval  <- 2 * (1 - stats::pt(abs(tval), df = df))
 
-  # rescale coefficients back to original X scale
   beta_rescaled <- beta
   if (has_int) {
     idx <- setdiff(seq_len(p), match("(Intercept)", colnames(X)))
