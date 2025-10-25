@@ -3,8 +3,8 @@ Type: Package
 Title: An R Implementation of a multiple linear regression model
 Version: 1.0.0
 Authors@R: c(
-    person(given = "Siyuan", family = "Xu", email = "ningschue@gmail.com", role = c("aut", "cre")),
-    person(given = "Mohan", family = "Zhang", email = "mohzh143@student.liu.se", role = c("aut")),
+    person(given = "Mohan", family = "Zhang", email = "mohzh143@student.liu.se", role = c("aut", "cre")),
+    person(given = "Siyuan", family = "Xu", email = "ningschue@gmail.com", role = c("aut")),
     person(given = "Chenzhi", family = "Ni", email = "cheni622@student.liu.se", role = c("aut"))
   )
 Description: This package implements multiple linear regression and ridge regression 
