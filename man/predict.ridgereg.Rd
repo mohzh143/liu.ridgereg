@@ -2,7 +2,7 @@
 % Please edit documentation in R/methods-ridgereg.R
 \name{predict.ridgereg}
 \alias{predict.ridgereg}
-\title{Predict method for ridgereg (alias)}
+\title{Predict method for ridgereg}
 \usage{
 \method{predict}{ridgereg}(object, newdata = NULL, ...)
 }
@@ -17,5 +17,5 @@
 numeric vector of predicted values
 }
 \description{
-Predict method for ridgereg (alias)
+Predict method for ridgereg
 }

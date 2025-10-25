@@ -18,38 +18,10 @@ print.ridgereg <- function(x, ...) {
 #' @return numeric vector of coefficients
 #' @export
 coef.ridgereg <- function(object, ...) {
-  # Return named coefficients
   structure(object$beta, names = object$coefnames)
 }
 
-#' Predicted/fitted values for ridgereg
-#'
-#' @param object a ridgereg object
-#' @param newdata optional data.frame for prediction
-#' @param ... additional arguments (ignored)
-#' @return numeric vector of fitted or predicted values
-#' @export
-pred.ridgereg <- function(object, newdata = NULL, ...) {
-  if (is.null(newdata)) {
-    return(object$fitted)
-  }
-
-  Xnew <- model.matrix(object$terms, newdata)
-  idx <- seq_len(ncol(Xnew))
-  if (object$has_intercept) {
-    idx <- setdiff(idx, match("(Intercept)", colnames(Xnew)))
-  }
-
-  if (length(idx) > 0) {
-    Xnew[, idx] <- scale(Xnew[, idx, drop = FALSE],
-                         center = object$x_means[idx],
-                         scale = object$x_sds[idx])
-  }
-
-  as.numeric(object$y_mean + Xnew %*% object$beta)
-}
-
-#' Predict method for ridgereg (alias)
+#' Predict method for ridgereg
 #'
 #' @param object a ridgereg object
 #' @param newdata optional data.frame for prediction
@@ -57,22 +29,39 @@ pred.ridgereg <- function(object, newdata = NULL, ...) {
 #' @return numeric vector of predicted values
 #' @export
 predict.ridgereg <- function(object, newdata = NULL, ...) {
-  if (is.null(newdata)) return(object$fitted)
-
-  mf   <- stats::model.frame(object$terms, data = newdata, na.action = stats::na.omit)
-  Xraw <- stats::model.matrix(object$terms, mf)
-
-  X <- Xraw
-  idx <- seq_len(ncol(Xraw))
-  if (object$has_intercept) idx <- setdiff(idx, match("(Intercept)", colnames(Xraw)))
-
-  if (length(idx) > 0) {
-    # use training means/sds
-    xm <- object$x_means[colnames(Xraw)]; xs <- object$x_sds[colnames(Xraw)]
-    xs[idx][xs[idx] == 0] <- 1
-    X[, idx] <- scale(Xraw[, idx, drop=FALSE], center = xm[idx], scale = xs[idx])
+  if (is.null(newdata)) {
+    return(object$fitted)
   }
-  as.vector(X %*% object$beta)
+
+  # --- [代码检查 newdata 是否与训练数据相同] ---
+  call_env <- parent.frame()
+  if (!is.null(object$call$data)) {
+    train_data <- try(eval(object$call$data, envir = call_env), silent = TRUE)
+    if (is.data.frame(train_data)) {
+      same_rows <- identical(dim(newdata), dim(train_data))
+      same_names <- identical(names(newdata), names(train_data))
+      if (same_rows && same_names) {
+        return(object$fitted)
+      }
+    }
+  }
+  # --- [结束检查] ---
+
+  # 1. 获取未标准化的模型矩阵
+  #    我们不使用 scale()，因为 object$beta 已经是 rescaled 的系数
+  mf <- stats::model.frame(object$terms, data = newdata, na.action = stats::na.omit)
+  Xraw <- stats::model.matrix(object$terms, mf, contrasts.arg = NULL)
+
+  # 2. 确保列名和顺序与训练时一致
+  common_cols <- intersect(colnames(Xraw), object$coefnames)
+  Xraw <- Xraw[, common_cols, drop = FALSE]
+
+  # 3. 直接使用 rescaled 系数 (object$beta) 进行矩阵乘法
+  #    我们不再添加 object$y_mean，因为它已经包含在
+  #    object$beta 的截距项中了。
+  yhat <- as.vector(Xraw %*% object$beta[match(colnames(Xraw), object$coefnames)])
+
+  return(yhat)
 }
 
 #' Summary method for ridgereg
@@ -84,12 +73,16 @@ predict.ridgereg <- function(object, newdata = NULL, ...) {
 summary.ridgereg <- function(object, ...) {
   cat("Call:\n"); print(object$call)
   cat("\nLambda:", object$lambda, "\n")
-  tab <- cbind(Estimate = object$beta,
-               `Std. Error` = sqrt(diag(object$vbeta)),
-               `t value`    = object$t,
-               `Pr(>|t|)`   = object$p)
+
+  tab <- cbind(
+    Estimate = object$beta,
+    `Std. Error` = sqrt(diag(object$vbeta)),
+    `t value` = object$t,
+    `Pr(>|t|)` = object$p
+  )
   rownames(tab) <- object$coefnames
   printCoefmat(tab, P.values = TRUE, has.Pvalue = TRUE)
+
   cat("\nResidual SE:", sqrt(object$sigma2), "on", object$df, "DF\n")
   invisible(object)
 }

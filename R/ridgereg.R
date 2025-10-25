@@ -20,13 +20,13 @@ ridgereg <- function(formula, data, lambda, method = c("normal", "qr")) {
   # setup
   mf   <- stats::model.frame(formula = formula, data = data, na.action = stats::na.omit)
   trm  <- stats::terms(mf)
-  Xraw <- stats::model.matrix(trm, mf)  # includes intercept
+  Xraw <- stats::model.matrix(trm, mf, contrasts.arg = NULL)  # includes intercept
   y    <- stats::model.response(mf)
   stopifnot(is.numeric(y))
 
   has_int <- "(Intercept)" %in% colnames(Xraw)
 
-  # center/scale predictors
+  # center/scale predictors (exclude intercept)
   idx <- seq_len(ncol(Xraw))
   if (has_int) idx <- setdiff(idx, match("(Intercept)", colnames(Xraw)))
 
@@ -40,6 +40,7 @@ ridgereg <- function(formula, data, lambda, method = c("normal", "qr")) {
     Xraw[, idx] <- scale(Xraw[, idx, drop = FALSE],
                          center = x_means[idx], scale = x_sds[idx])
   }
+
   X <- Xraw
   y_mean <- mean(y)
   y_centered <- y - y_mean
@@ -66,7 +67,7 @@ ridgereg <- function(formula, data, lambda, method = c("normal", "qr")) {
     beta <- qr.coef(qrZ, z)
   }
 
-  # fitted values
+  # fitted values (rescaled back to original y scale)
   yhat_centered <- as.vector(X %*% beta)
   yhat <- y_mean + yhat_centered
   resid <- y - yhat
@@ -75,7 +76,7 @@ ridgereg <- function(formula, data, lambda, method = c("normal", "qr")) {
   df <- n - qr(X)$rank
   sigma2 <- sum(resid^2) / max(1, df)
 
-  # approximate inference
+  # inference
   pen <- diag(p)
   if (has_int) pen[match("(Intercept)", colnames(X)), match("(Intercept)", colnames(X))] <- 0
   XtX <- crossprod(X)
@@ -85,13 +86,24 @@ ridgereg <- function(formula, data, lambda, method = c("normal", "qr")) {
   tval  <- beta / se
   pval  <- 2 * (1 - stats::pt(abs(tval), df = df))
 
+  # rescale coefficients back to original X scale
+  beta_rescaled <- beta
+  if (has_int) {
+    idx <- setdiff(seq_len(p), match("(Intercept)", colnames(X)))
+    beta_rescaled[idx] <- beta[idx] / x_sds[idx]
+    beta_rescaled[match("(Intercept)", colnames(X))] <-
+      y_mean - sum(beta[idx] * x_means[idx] / x_sds[idx])
+  } else {
+    beta_rescaled <- beta / x_sds
+  }
+
   # output object
   names(beta) <- colnames(X)
   out <- list(
     call = match.call(),
     terms = trm,
     lambda = lambda,
-    beta = as.numeric(beta),
+    beta = as.numeric(beta_rescaled),  # return rescaled betas
     coefnames = colnames(X),
     fitted = yhat,
     resid = resid,
