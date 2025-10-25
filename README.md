@@ -9,11 +9,10 @@
 ## Overview
 
 The **`liu.ridgereg`** package provides an implementation of multiple linear regression and ridge regression models in R using the **S3 object-oriented system**.  
-It includes generic methods such as `print()`, `summary()`, `coef()`, `pred()`, and `plot()` for model interpretation and visualization.
+It includes generic methods such as `print()`, `summary()`, `coef()`, `predict()`, and `plot()` for model interpretation and visualization.
 
-The package also contains **two vignettes** demonstrating real-world predictive modeling:
-1. **Flight delay prediction** using `nycflights13`
-2. **Boston housing price prediction** using `BostonHousing` (ridge regression)
+The package also contains **one vignette** demonstrating real-world predictive modeling:
+**Boston housing price prediction** using `BostonHousing` (ridge regression)
 
 ---
 
@@ -41,7 +40,7 @@ library(liu.ridgereg)
 | `ridgereg()` | Fit a ridge regression model with a specified lambda |
 | `linreg()` | Fit an ordinary least squares linear regression |
 | `coef()` | Extract estimated coefficients |
-| `pred()` | Compute fitted or predicted values |
+| `predict()` | Compute fitted or predicted values |
 | `resid()` | Extract residuals |
 | `summary()` | Display model statistics |
 | `plot()` | Plot diagnostic or performance visualizations |
@@ -74,7 +73,6 @@ You can view the example reports after building vignettes:
 vignette(package = "liu.ridgereg")
 ```
 
-- [Flight delay prediction using ridgereg](./doc/flight_delay.html)  
 - [Predictive modeling with ridgereg (BostonHousing)](./doc/ridgereg.html)
 
 ---
@@ -117,7 +115,6 @@ If you use this package in your work, please cite it as:
 
 - `?ridgereg` for model documentation  
 - `vignette("ridgereg", package = "liu.ridgereg")` for ridge model example  
-- `vignette("flight_delay", package = "liu.ridgereg")` for predictive application  
 
 ---
 
