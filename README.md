@@ -11,7 +11,7 @@
 The **`liu.ridgereg`** package provides an implementation of multiple linear regression and ridge regression models in R using the **S3 object-oriented system**.  
 It includes generic methods such as `print()`, `summary()`, `coef()`, `predict()`, and `plot()` for model interpretation and visualization.
 
-The package also contains **one vignette** demonstrating real-world predictive modeling:
+The package also contains **vignette** demonstrating real-world predictive modeling:
 **Boston housing price prediction** using `BostonHousing` (ridge regression)
 
 ---
@@ -77,17 +77,6 @@ vignette(package = "liu.ridgereg")
 
 ---
 
-## Learning Highlights
-
-This package was developed as part of the **732A94 Advanced R Programming** course at **Linköping University**.  
-It demonstrates:
-- Implementation of **S3 classes and methods**  
-- **Model validation and visualization**  
-- Integration of **real datasets** (`BostonHousing`, `nycflights13`)  
-- Creation of **vignettes**, **tests**, and **documentation** following CRAN standards  
-
----
-
 ## Authors
 
 - **Siyuan Xu** – <ningschue@gmail.com>  
@@ -99,15 +88,6 @@ It demonstrates:
 ## License
 
 MIT License (see [LICENSE](./LICENSE))
-
----
-
-## Citation
-
-If you use this package in your work, please cite it as:
-
-> Xu, S., Zhang, M., & Ni, C. (2025). *liu.ridgereg: Ridge and Linear Regression Implemented with S3 Methods.*  
-> Linköping University, Course 732A94 Advanced R Programming.
 
 ---
 
