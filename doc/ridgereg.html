@@ -12,7 +12,7 @@
 
 
 
-<title>Predictive modeling with ridgereg (BostonHousing)</title>
+<title>Predictive Modeling with liu.ridgereg (BostonHousing)</title>
 
 <script>// Pandoc 2.9 adds attributes on both header and div. We remove the former (to
 // be compatible with the behavior of Pandoc < 2.8).
@@ -337,7 +337,7 @@ code > span.er { color: #a61717; background-color: #e3d2d2; }
 
 
 
-<h1 class="title toc-ignore">Predictive modeling with ridgereg
+<h1 class="title toc-ignore">Predictive Modeling with liu.ridgereg
 (BostonHousing)</h1>
 
 
@@ -345,229 +345,455 @@ code > span.er { color: #a61717; background-color: #e3d2d2; }
 <div id="introduction" class="section level1">
 <h1>Introduction</h1>
 <p>This vignette demonstrates how to use the
-<strong><code>ridgereg()</code></strong> function (implemented in this
-package) for predictive modeling with the <strong>BostonHousing</strong>
-dataset from the <code>mlbench</code> package.</p>
-<p>We compare three models:</p>
-<ol style="list-style-type: decimal">
-<li>Ordinary Linear Regression (<code>lm</code>)</li>
-<li>Stepwise Linear Regression (<code>stepAIC</code>)</li>
-<li>Ridge Regression (<code>ridgereg</code>) with cross-validated λ</li>
-</ol>
+<strong><code>ridgereg()</code></strong> for a predictive modeling task.
+We will compare the performance of our custom
+<strong><code>ridgereg()</code></strong> function against a standard
+Linear Model (LM) and a Linear Model with Forward Selection.</p>
+<p>We will use the <code>caret</code> package to streamline the process
+of data splitting, model training (including cross-validation), and
+evaluation. The dataset for this analysis is the
+<code>BostonHousing</code> dataset from the <code>mlbench</code>
+package.</p>
 <hr />
 </div>
 <div id="data-preparation" class="section level1">
 <h1>Data Preparation</h1>
-<div class="sourceCode" id="cb1"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" tabindex="-1"></a><span class="fu">data</span>(<span class="st">&quot;BostonHousing&quot;</span>, <span class="at">package =</span> <span class="st">&quot;mlbench&quot;</span>)</span>
-<span id="cb1-2"><a href="#cb1-2" tabindex="-1"></a></span>
-<span id="cb1-3"><a href="#cb1-3" tabindex="-1"></a><span class="co"># Split training/testing sets</span></span>
-<span id="cb1-4"><a href="#cb1-4" tabindex="-1"></a>train_index <span class="ot">&lt;-</span> <span class="fu">createDataPartition</span>(BostonHousing<span class="sc">$</span>medv, <span class="at">p =</span> <span class="fl">0.8</span>, <span class="at">list =</span> <span class="cn">FALSE</span>)</span>
-<span id="cb1-5"><a href="#cb1-5" tabindex="-1"></a>train <span class="ot">&lt;-</span> BostonHousing[train_index, ]</span>
-<span id="cb1-6"><a href="#cb1-6" tabindex="-1"></a>test  <span class="ot">&lt;-</span> BostonHousing[<span class="sc">-</span>train_index, ]</span>
+<p>First, we load the <code>BostonHousing</code> data. We then set a
+random seed (<code>set.seed(123)</code>) to ensure that our data split
+is reproducible. We partition the data using
+<code>createDataPartition</code> from the caret package, allocating 80%
+of the data for training and the remaining 20% for testing.</p>
+<p>We also define our cross-validation strategy using
+<code>trainControl</code>. We will use 10-fold cross-validation
+(<code>method = &quot;cv&quot;, number = 10</code>) to tune our models.</p>
+<div class="sourceCode" id="cb1"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" tabindex="-1"></a><span class="co"># Load the dataset</span></span>
+<span id="cb1-2"><a href="#cb1-2" tabindex="-1"></a><span class="fu">data</span>(BostonHousing, <span class="at">package =</span> <span class="st">&quot;mlbench&quot;</span>)</span>
+<span id="cb1-3"><a href="#cb1-3" tabindex="-1"></a></span>
+<span id="cb1-4"><a href="#cb1-4" tabindex="-1"></a><span class="co"># Ensure reproducibility for the data split</span></span>
+<span id="cb1-5"><a href="#cb1-5" tabindex="-1"></a><span class="fu">set.seed</span>(<span class="dv">123</span>) </span>
+<span id="cb1-6"><a href="#cb1-6" tabindex="-1"></a>trainIndex <span class="ot">&lt;-</span> <span class="fu">createDataPartition</span>(BostonHousing<span class="sc">$</span>medv, <span class="at">p =</span> <span class="fl">0.8</span>, <span class="at">list =</span> <span class="cn">FALSE</span>)</span>
 <span id="cb1-7"><a href="#cb1-7" tabindex="-1"></a></span>
-<span id="cb1-8"><a href="#cb1-8" tabindex="-1"></a><span class="co"># Features and target</span></span>
-<span id="cb1-9"><a href="#cb1-9" tabindex="-1"></a>y_train <span class="ot">&lt;-</span> train<span class="sc">$</span>medv</span>
-<span id="cb1-10"><a href="#cb1-10" tabindex="-1"></a>y_test  <span class="ot">&lt;-</span> test<span class="sc">$</span>medv</span></code></pre></div>
+<span id="cb1-8"><a href="#cb1-8" tabindex="-1"></a><span class="co"># Create training and testing sets</span></span>
+<span id="cb1-9"><a href="#cb1-9" tabindex="-1"></a>trainData <span class="ot">&lt;-</span> BostonHousing[trainIndex, ]</span>
+<span id="cb1-10"><a href="#cb1-10" tabindex="-1"></a>testData  <span class="ot">&lt;-</span> BostonHousing[<span class="sc">-</span>trainIndex, ]</span>
+<span id="cb1-11"><a href="#cb1-11" tabindex="-1"></a></span>
+<span id="cb1-12"><a href="#cb1-12" tabindex="-1"></a><span class="fu">cat</span>(<span class="st">&quot;Training data rows:&quot;</span>, <span class="fu">nrow</span>(trainData), <span class="st">&quot;</span><span class="sc">\n</span><span class="st">&quot;</span>)</span></code></pre></div>
+<pre><code>## Training data rows: 407</code></pre>
+<div class="sourceCode" id="cb3"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" tabindex="-1"></a><span class="fu">cat</span>(<span class="st">&quot;Testing data rows:&quot;</span>, <span class="fu">nrow</span>(testData), <span class="st">&quot;</span><span class="sc">\n</span><span class="st">&quot;</span>)</span></code></pre></div>
+<pre><code>## Testing data rows: 99</code></pre>
+<div class="sourceCode" id="cb5"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" tabindex="-1"></a><span class="co"># Set up 10-fold cross-validation</span></span>
+<span id="cb5-2"><a href="#cb5-2" tabindex="-1"></a>trControl <span class="ot">&lt;-</span> <span class="fu">trainControl</span>(</span>
+<span id="cb5-3"><a href="#cb5-3" tabindex="-1"></a>  <span class="at">method =</span> <span class="st">&quot;cv&quot;</span>,    <span class="co"># Cross-Validation</span></span>
+<span id="cb5-4"><a href="#cb5-4" tabindex="-1"></a>  <span class="at">number =</span> <span class="dv">10</span>       <span class="co"># 10 folds</span></span>
+<span id="cb5-5"><a href="#cb5-5" tabindex="-1"></a>)</span></code></pre></div>
 <hr />
 </div>
-<div id="ordinary-linear-regression" class="section level1">
-<h1>1. Ordinary Linear Regression</h1>
-<div class="sourceCode" id="cb2"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" tabindex="-1"></a>lm_model <span class="ot">&lt;-</span> <span class="fu">lm</span>(medv <span class="sc">~</span> ., <span class="at">data =</span> train)</span>
-<span id="cb2-2"><a href="#cb2-2" tabindex="-1"></a><span class="fu">summary</span>(lm_model)</span></code></pre></div>
+<div id="fit-linear-models" class="section level1">
+<h1>Fit Linear Models</h1>
+<div id="standard-linear-regression-lm" class="section level2">
+<h2>Standard Linear Regression (LM)</h2>
+<p>We fit a standard linear regression model using all available
+predictors. Because ridge regression is sensitive to the scale of
+predictors, we must standardize (center and scale) our predictors here
+for a fair comparison. caret handles this via the preProcess
+argument.</p>
+<div class="sourceCode" id="cb6"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" tabindex="-1"></a><span class="co"># Ensure reproducibility for CV folds</span></span>
+<span id="cb6-2"><a href="#cb6-2" tabindex="-1"></a><span class="fu">set.seed</span>(<span class="dv">123</span>) </span>
+<span id="cb6-3"><a href="#cb6-3" tabindex="-1"></a>model_lm <span class="ot">&lt;-</span> caret<span class="sc">::</span><span class="fu">train</span>(</span>
+<span id="cb6-4"><a href="#cb6-4" tabindex="-1"></a>  medv <span class="sc">~</span> .,</span>
+<span id="cb6-5"><a href="#cb6-5" tabindex="-1"></a>  <span class="at">data =</span> trainData,</span>
+<span id="cb6-6"><a href="#cb6-6" tabindex="-1"></a>  <span class="at">method =</span> <span class="st">&quot;lm&quot;</span>,</span>
+<span id="cb6-7"><a href="#cb6-7" tabindex="-1"></a>  <span class="at">trControl =</span> trControl,</span>
+<span id="cb6-8"><a href="#cb6-8" tabindex="-1"></a>  <span class="at">preProcess =</span> <span class="fu">c</span>(<span class="st">&quot;center&quot;</span>, <span class="st">&quot;scale&quot;</span>) <span class="co"># Standardize predictors</span></span>
+<span id="cb6-9"><a href="#cb6-9" tabindex="-1"></a>)</span>
+<span id="cb6-10"><a href="#cb6-10" tabindex="-1"></a></span>
+<span id="cb6-11"><a href="#cb6-11" tabindex="-1"></a><span class="co"># Print the CV results</span></span>
+<span id="cb6-12"><a href="#cb6-12" tabindex="-1"></a><span class="fu">print</span>(model_lm)</span></code></pre></div>
+<pre><code>## Linear Regression 
+## 
+## 407 samples
+##  13 predictor
+## 
+## Pre-processing: centered (13), scaled (13) 
+## Resampling: Cross-Validated (10 fold) 
+## Summary of sample sizes: 366, 367, 366, 366, 366, 366, ... 
+## Resampling results:
+## 
+##   RMSE      Rsquared   MAE   
+##   4.818679  0.7360525  3.4088
+## 
+## Tuning parameter &#39;intercept&#39; was held constant at a value of TRUE</code></pre>
+</div>
+<div id="linear-regression-with-forward-selection" class="section level2">
+<h2>Linear Regression with Forward Selection</h2>
+<p>Next, we fit a linear model using forward selection
+(<code>method = &quot;leapForward&quot;</code>). This method treats the number of
+predictors (<code>nvmax</code>) as a tuning parameter. We create a
+<code>tuneGrid</code> to test all possible numbers of predictors, from 1
+to 13 (the total number of predictors for this case).</p>
+<div class="sourceCode" id="cb8"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb8-1"><a href="#cb8-1" tabindex="-1"></a><span class="co"># Define the tuning grid: test models from 1 to p variables</span></span>
+<span id="cb8-2"><a href="#cb8-2" tabindex="-1"></a>p <span class="ot">&lt;-</span> <span class="fu">ncol</span>(trainData) <span class="sc">-</span> <span class="dv">1</span> <span class="co"># p = 13 predictors</span></span>
+<span id="cb8-3"><a href="#cb8-3" tabindex="-1"></a>fwd_grid <span class="ot">&lt;-</span> <span class="fu">expand.grid</span>(<span class="at">nvmax =</span> <span class="dv">1</span><span class="sc">:</span>p)</span>
+<span id="cb8-4"><a href="#cb8-4" tabindex="-1"></a></span>
+<span id="cb8-5"><a href="#cb8-5" tabindex="-1"></a><span class="co"># Ensure reproducibility</span></span>
+<span id="cb8-6"><a href="#cb8-6" tabindex="-1"></a><span class="fu">set.seed</span>(<span class="dv">123</span>) </span>
+<span id="cb8-7"><a href="#cb8-7" tabindex="-1"></a>model_fwd <span class="ot">&lt;-</span> caret<span class="sc">::</span><span class="fu">train</span>(</span>
+<span id="cb8-8"><a href="#cb8-8" tabindex="-1"></a>  medv <span class="sc">~</span> .,</span>
+<span id="cb8-9"><a href="#cb8-9" tabindex="-1"></a>  <span class="at">data =</span> trainData,</span>
+<span id="cb8-10"><a href="#cb8-10" tabindex="-1"></a>  <span class="at">method =</span> <span class="st">&quot;leapForward&quot;</span>,</span>
+<span id="cb8-11"><a href="#cb8-11" tabindex="-1"></a>  <span class="at">trControl =</span> trControl,</span>
+<span id="cb8-12"><a href="#cb8-12" tabindex="-1"></a>  <span class="at">preProcess =</span> <span class="fu">c</span>(<span class="st">&quot;center&quot;</span>, <span class="st">&quot;scale&quot;</span>), <span class="co"># Standardize predictors</span></span>
+<span id="cb8-13"><a href="#cb8-13" tabindex="-1"></a>  <span class="at">tuneGrid =</span> fwd_grid               <span class="co"># Tune the number of variables</span></span>
+<span id="cb8-14"><a href="#cb8-14" tabindex="-1"></a>)</span>
+<span id="cb8-15"><a href="#cb8-15" tabindex="-1"></a></span>
+<span id="cb8-16"><a href="#cb8-16" tabindex="-1"></a><span class="co"># Print the results</span></span>
+<span id="cb8-17"><a href="#cb8-17" tabindex="-1"></a><span class="fu">print</span>(model_fwd)</span></code></pre></div>
+<pre><code>## Linear Regression with Forward Selection 
+## 
+## 407 samples
+##  13 predictor
+## 
+## Pre-processing: centered (13), scaled (13) 
+## Resampling: Cross-Validated (10 fold) 
+## Summary of sample sizes: 366, 367, 366, 366, 366, 366, ... 
+## Resampling results across tuning parameters:
+## 
+##   nvmax  RMSE      Rsquared   MAE     
+##    1     6.078799  0.5988185  4.476019
+##    2     5.535976  0.6729081  4.005710
+##    3     5.213052  0.6945262  3.682000
+##    4     5.216457  0.6929382  3.674384
+##    5     5.099042  0.7061672  3.585318
+##    6     5.009519  0.7159313  3.481756
+##    7     5.002583  0.7150297  3.467237
+##    8     4.940668  0.7220457  3.463943
+##    9     4.923702  0.7244597  3.440252
+##   10     4.888873  0.7286459  3.439640
+##   11     4.807413  0.7375883  3.390684
+##   12     4.815615  0.7364321  3.402883
+##   13     4.818679  0.7360525  3.408800
+## 
+## RMSE was used to select the optimal model using the smallest value.
+## The final value used for the model was nvmax = 11.</code></pre>
+<p>We can plot the cross-validation error (RMSE) as a function of the
+number of variables included in the model.</p>
+<div class="sourceCode" id="cb10"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb10-1"><a href="#cb10-1" tabindex="-1"></a><span class="fu">plot</span>(model_fwd, <span class="at">main =</span> <span class="st">&quot;RMSE vs. Number of Variables&quot;</span>,<span class="at">cex.main =</span> <span class="fl">0.1</span>)</span></code></pre></div>
+<p><img role="img" src="data:image/png;base64,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" width="70%" style="display: block; margin: auto;" /></p>
+<p>As the figure shown above, the cross-validated RMSE consistently
+decreases as we add more variables, dropping sharply from 6.08 (1
+variable) to 5.01 (6 variables). The optimal model, as determined by the
+lowest RMSE, is the one with nvmax = 11 variables, which achieved an
+RMSE of 4.807. Adding the 12th and 13th variables causes the RMSE to
+slightly increase (to 4.816 and 4.819, respectively). This value for
+nvmax = 13 (4.819) correctly matches the RMSE of our standard linear
+model (model_lm), which uses all 13 predictors. This slight increase
+suggests that the full model is marginally overfit, and a 11-variable
+model provides slightly better predictive accuracy on this training
+data.</p>
+<p>We can also extract the variables selected by the best-performing
+model.</p>
+<div class="sourceCode" id="cb11"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb11-1"><a href="#cb11-1" tabindex="-1"></a>best_nvmax <span class="ot">&lt;-</span> model_fwd<span class="sc">$</span>bestTune<span class="sc">$</span>nvmax</span>
+<span id="cb11-2"><a href="#cb11-2" tabindex="-1"></a><span class="co"># Get coefficients from the final model (which is a &#39;regsubsets&#39; object)</span></span>
+<span id="cb11-3"><a href="#cb11-3" tabindex="-1"></a>best_coefs <span class="ot">&lt;-</span> <span class="fu">coef</span>(model_fwd<span class="sc">$</span>finalModel, <span class="at">id =</span> best_nvmax)</span>
+<span id="cb11-4"><a href="#cb11-4" tabindex="-1"></a><span class="fu">cat</span>(<span class="st">&quot;Selected variables:</span><span class="sc">\n</span><span class="st">&quot;</span>)</span></code></pre></div>
+<pre><code>## Selected variables:</code></pre>
+<div class="sourceCode" id="cb13"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb13-1"><a href="#cb13-1" tabindex="-1"></a><span class="fu">print</span>(<span class="fu">names</span>(best_coefs))</span></code></pre></div>
+<pre><code>##  [1] &quot;(Intercept)&quot; &quot;crim&quot;        &quot;zn&quot;          &quot;chas1&quot;       &quot;nox&quot;        
+##  [6] &quot;rm&quot;          &quot;dis&quot;         &quot;rad&quot;         &quot;tax&quot;         &quot;ptratio&quot;    
+## [11] &quot;b&quot;           &quot;lstat&quot;</code></pre>
+<hr />
+</div>
+</div>
+<div id="evaluate-performance-on-training-set" class="section level1">
+<h1>Evaluate Performance on Training Set</h1>
+<p>We can now compare the cross-validation performance of above two
+models. The <code>resamples</code> function collects the CV results from
+models trained with the same resampling indices, allowing for a direct
+comparison.</p>
+<div class="sourceCode" id="cb15"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb15-1"><a href="#cb15-1" tabindex="-1"></a>models_list_base <span class="ot">&lt;-</span> <span class="fu">list</span>(</span>
+<span id="cb15-2"><a href="#cb15-2" tabindex="-1"></a>  <span class="at">LM =</span> model_lm,</span>
+<span id="cb15-3"><a href="#cb15-3" tabindex="-1"></a>  <span class="at">Forward =</span> model_fwd</span>
+<span id="cb15-4"><a href="#cb15-4" tabindex="-1"></a>)</span>
+<span id="cb15-5"><a href="#cb15-5" tabindex="-1"></a>cv_results_base <span class="ot">&lt;-</span> <span class="fu">resamples</span>(models_list_base)</span>
+<span id="cb15-6"><a href="#cb15-6" tabindex="-1"></a><span class="co"># Show summary of CV statistics</span></span>
+<span id="cb15-7"><a href="#cb15-7" tabindex="-1"></a><span class="fu">summary</span>(cv_results_base)</span></code></pre></div>
 <pre><code>## 
 ## Call:
-## lm(formula = medv ~ ., data = train)
+## summary.resamples(object = cv_results_base)
 ## 
-## Residuals:
-##      Min       1Q   Median       3Q      Max 
-## -14.9550  -2.7996  -0.4647   1.7767  25.0993 
+## Models: LM, Forward 
+## Number of resamples: 10 
 ## 
-## Coefficients:
-##               Estimate Std. Error t value Pr(&gt;|t|)    
-## (Intercept)  37.733617   5.619935   6.714 6.63e-11 ***
-## crim         -0.093857   0.039157  -2.397 0.016999 *  
-## zn            0.039436   0.015987   2.467 0.014062 *  
-## indus        -0.012988   0.069595  -0.187 0.852059    
-## chas1         2.290187   0.940621   2.435 0.015346 *  
-## nox         -17.130560   4.342272  -3.945 9.45e-05 ***
-## rm            3.499219   0.451445   7.751 7.87e-14 ***
-## age           0.009823   0.015510   0.633 0.526905    
-## dis          -1.390769   0.230614  -6.031 3.77e-09 ***
-## rad           0.330939   0.077135   4.290 2.25e-05 ***
-## tax          -0.012386   0.004342  -2.852 0.004568 ** 
-## ptratio      -0.960676   0.150307  -6.391 4.66e-10 ***
-## b             0.009841   0.002935   3.353 0.000877 ***
-## lstat        -0.562095   0.059180  -9.498  &lt; 2e-16 ***
-## ---
-## Signif. codes:  0 &#39;***&#39; 0.001 &#39;**&#39; 0.01 &#39;*&#39; 0.05 &#39;.&#39; 0.1 &#39; &#39; 1
+## MAE 
+##             Min.  1st Qu.   Median     Mean  3rd Qu.     Max. NA&#39;s
+## LM      2.740893 3.005405 3.404101 3.408800 3.792326 4.237117    0
+## Forward 2.713556 2.965090 3.390514 3.390684 3.789517 4.244066    0
 ## 
-## Residual standard error: 4.801 on 393 degrees of freedom
-## Multiple R-squared:  0.7346, Adjusted R-squared:  0.7258 
-## F-statistic: 83.68 on 13 and 393 DF,  p-value: &lt; 2.2e-16</code></pre>
-<div class="sourceCode" id="cb4"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" tabindex="-1"></a><span class="co"># Prediction and RMSE</span></span>
-<span id="cb4-2"><a href="#cb4-2" tabindex="-1"></a>pred_lm <span class="ot">&lt;-</span> <span class="fu">predict</span>(lm_model, <span class="at">newdata =</span> test)</span>
-<span id="cb4-3"><a href="#cb4-3" tabindex="-1"></a>rmse_lm <span class="ot">&lt;-</span> <span class="fu">sqrt</span>(<span class="fu">mean</span>((pred_lm <span class="sc">-</span> y_test)<span class="sc">^</span><span class="dv">2</span>))</span>
-<span id="cb4-4"><a href="#cb4-4" tabindex="-1"></a>rmse_lm</span></code></pre></div>
-<pre><code>## [1] 4.588948</code></pre>
+## RMSE 
+##             Min.  1st Qu.   Median     Mean  3rd Qu.     Max. NA&#39;s
+## LM      3.652840 4.164296 4.697268 4.818679 5.409228 6.154202    0
+## Forward 3.617192 4.151341 4.696125 4.807413 5.385284 6.157500    0
+## 
+## Rsquared 
+##              Min.   1st Qu.    Median      Mean   3rd Qu.      Max. NA&#39;s
+## LM      0.5949196 0.7079916 0.7707270 0.7360525 0.7902890 0.8119818    0
+## Forward 0.5979866 0.7074637 0.7710428 0.7375883 0.7915799 0.8153254    0</code></pre>
+<p>The <code>summary(cv_results_base)</code> table provides the
+numerical details for our 10-fold cross-validation. The full Linear
+Model (LM) had a mean CV RMSE of 4.819, while the 11-variable Forward
+Selection model had a mean CV RMSE of 4.807.</p>
+<p>A boxplot provides a clear visual comparison of the distribution of
+RMSE values from the 10-fold cross-validation for each model.</p>
+<div class="sourceCode" id="cb17"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb17-1"><a href="#cb17-1" tabindex="-1"></a><span class="fu">bwplot</span>(cv_results_base, </span>
+<span id="cb17-2"><a href="#cb17-2" tabindex="-1"></a>       <span class="at">metric =</span> <span class="st">&quot;RMSE&quot;</span>,</span>
+<span id="cb17-3"><a href="#cb17-3" tabindex="-1"></a>       <span class="at">cex =</span> <span class="fl">0.7</span>)</span></code></pre></div>
+<p><img role="img" src="data:image/png;base64,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" width="70%" style="display: block; margin: auto;" />
+Above boxplot visually confirms our finding. The entire distribution of
+cross-validation errors for the ‘Forward’ model—including its median
+(black dot) and interquartile range (the box)—is shifted slightly to the
+left (indicating a lower RMSE) compared to the ‘LM’. While the
+performance difference is very small (approx. 0.012), it reinforces our
+earlier conclusion: the 11-variable model selected by forward selection
+is slightly more robust and less overfit than the full 13-variable
+model.</p>
 <hr />
 </div>
-<div id="stepwise-linear-regression-forward-selection" class="section level1">
-<h1>2. Stepwise Linear Regression (Forward Selection)</h1>
-<div class="sourceCode" id="cb6"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" tabindex="-1"></a>step_model <span class="ot">&lt;-</span> <span class="fu">stepAIC</span>(<span class="fu">lm</span>(medv <span class="sc">~</span> <span class="dv">1</span>, <span class="at">data =</span> train),</span>
-<span id="cb6-2"><a href="#cb6-2" tabindex="-1"></a>                      <span class="at">scope =</span> <span class="fu">list</span>(<span class="at">lower =</span> <span class="sc">~</span><span class="dv">1</span>, <span class="at">upper =</span> <span class="sc">~</span>.),</span>
-<span id="cb6-3"><a href="#cb6-3" tabindex="-1"></a>                      <span class="at">direction =</span> <span class="st">&quot;forward&quot;</span>,</span>
-<span id="cb6-4"><a href="#cb6-4" tabindex="-1"></a>                      <span class="at">trace =</span> <span class="cn">FALSE</span>)</span>
-<span id="cb6-5"><a href="#cb6-5" tabindex="-1"></a><span class="fu">summary</span>(step_model)</span></code></pre></div>
-<pre><code>## 
-## Call:
-## lm(formula = medv ~ 1, data = train)
-## 
-## Residuals:
-##     Min      1Q  Median      3Q     Max 
-## -17.511  -5.561  -1.411   2.489  27.489 
-## 
-## Coefficients:
-##             Estimate Std. Error t value Pr(&gt;|t|)    
-## (Intercept)  22.5106     0.4544   49.53   &lt;2e-16 ***
-## ---
-## Signif. codes:  0 &#39;***&#39; 0.001 &#39;**&#39; 0.01 &#39;*&#39; 0.05 &#39;.&#39; 0.1 &#39; &#39; 1
-## 
-## Residual standard error: 9.168 on 406 degrees of freedom</code></pre>
-<div class="sourceCode" id="cb8"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb8-1"><a href="#cb8-1" tabindex="-1"></a>pred_step <span class="ot">&lt;-</span> <span class="fu">predict</span>(step_model, <span class="at">newdata =</span> test)</span>
-<span id="cb8-2"><a href="#cb8-2" tabindex="-1"></a>rmse_step <span class="ot">&lt;-</span> <span class="fu">sqrt</span>(<span class="fu">mean</span>((pred_step <span class="sc">-</span> y_test)<span class="sc">^</span><span class="dv">2</span>))</span>
-<span id="cb8-3"><a href="#cb8-3" tabindex="-1"></a>rmse_step</span></code></pre></div>
-<pre><code>## [1] 9.315438</code></pre>
-<hr />
-</div>
-<div id="ridge-regression-with-cross-validation" class="section level1">
-<h1>3. Ridge Regression with Cross-Validation</h1>
-<p>We test λ = {0.01, 0.1, 1, 10, 100} and use 10-fold CV to find the
-best λ.</p>
-<div class="sourceCode" id="cb10"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb10-1"><a href="#cb10-1" tabindex="-1"></a>lambdas <span class="ot">&lt;-</span> <span class="fu">c</span>(<span class="fl">0.01</span>, <span class="fl">0.1</span>, <span class="dv">1</span>, <span class="dv">10</span>, <span class="dv">100</span>)</span>
-<span id="cb10-2"><a href="#cb10-2" tabindex="-1"></a>cv_results <span class="ot">&lt;-</span> <span class="fu">data.frame</span>(<span class="at">lambda =</span> lambdas, <span class="at">RMSE =</span> <span class="cn">NA</span>)</span>
-<span id="cb10-3"><a href="#cb10-3" tabindex="-1"></a></span>
-<span id="cb10-4"><a href="#cb10-4" tabindex="-1"></a><span class="cf">for</span> (i <span class="cf">in</span> <span class="fu">seq_along</span>(lambdas)) {</span>
-<span id="cb10-5"><a href="#cb10-5" tabindex="-1"></a>  lambda_val <span class="ot">&lt;-</span> lambdas[i]</span>
-<span id="cb10-6"><a href="#cb10-6" tabindex="-1"></a>  folds <span class="ot">&lt;-</span> <span class="fu">createFolds</span>(train<span class="sc">$</span>medv, <span class="at">k =</span> <span class="dv">10</span>, <span class="at">list =</span> <span class="cn">TRUE</span>)</span>
-<span id="cb10-7"><a href="#cb10-7" tabindex="-1"></a>  fold_rmse <span class="ot">&lt;-</span> <span class="fu">numeric</span>(<span class="fu">length</span>(folds))</span>
-<span id="cb10-8"><a href="#cb10-8" tabindex="-1"></a>  </span>
-<span id="cb10-9"><a href="#cb10-9" tabindex="-1"></a>  <span class="cf">for</span> (j <span class="cf">in</span> <span class="fu">seq_along</span>(folds)) {</span>
-<span id="cb10-10"><a href="#cb10-10" tabindex="-1"></a>    fold_train <span class="ot">&lt;-</span> train[<span class="sc">-</span>folds[[j]], ]</span>
-<span id="cb10-11"><a href="#cb10-11" tabindex="-1"></a>    fold_test  <span class="ot">&lt;-</span> train[folds[[j]], ]</span>
-<span id="cb10-12"><a href="#cb10-12" tabindex="-1"></a>    model <span class="ot">&lt;-</span> <span class="fu">ridgereg</span>(medv <span class="sc">~</span> ., <span class="at">data =</span> fold_train, <span class="at">lambda =</span> lambda_val)</span>
-<span id="cb10-13"><a href="#cb10-13" tabindex="-1"></a>    pred  <span class="ot">&lt;-</span> <span class="fu">predict</span>(model, <span class="at">newdata =</span> fold_test)</span>
-<span id="cb10-14"><a href="#cb10-14" tabindex="-1"></a>    fold_rmse[j] <span class="ot">&lt;-</span> <span class="fu">sqrt</span>(<span class="fu">mean</span>((pred <span class="sc">-</span> fold_test<span class="sc">$</span>medv)<span class="sc">^</span><span class="dv">2</span>))</span>
-<span id="cb10-15"><a href="#cb10-15" tabindex="-1"></a>  }</span>
-<span id="cb10-16"><a href="#cb10-16" tabindex="-1"></a>  cv_results<span class="sc">$</span>RMSE[i] <span class="ot">&lt;-</span> <span class="fu">mean</span>(fold_rmse)</span>
-<span id="cb10-17"><a href="#cb10-17" tabindex="-1"></a>}</span>
-<span id="cb10-18"><a href="#cb10-18" tabindex="-1"></a></span>
-<span id="cb10-19"><a href="#cb10-19" tabindex="-1"></a>cv_results</span></code></pre></div>
-<pre><code>##   lambda     RMSE
-## 1  1e-02 4.853980
-## 2  1e-01 4.857352
-## 3  1e+00 4.866646
-## 4  1e+01 4.929898
-## 5  1e+02 5.042964</code></pre>
-<div class="sourceCode" id="cb12"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb12-1"><a href="#cb12-1" tabindex="-1"></a>best_lambda <span class="ot">&lt;-</span> cv_results<span class="sc">$</span>lambda[<span class="fu">which.min</span>(cv_results<span class="sc">$</span>RMSE)]</span>
-<span id="cb12-2"><a href="#cb12-2" tabindex="-1"></a>best_lambda</span></code></pre></div>
-<pre><code>## [1] 0.01</code></pre>
-<hr />
-</div>
-<div id="final-ridge-model-and-evaluation" class="section level1">
-<h1>4. Final Ridge Model and Evaluation</h1>
-<div class="sourceCode" id="cb14"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb14-1"><a href="#cb14-1" tabindex="-1"></a>ridge_final <span class="ot">&lt;-</span> <span class="fu">ridgereg</span>(medv <span class="sc">~</span> ., <span class="at">data =</span> train, <span class="at">lambda =</span> best_lambda)</span>
-<span id="cb14-2"><a href="#cb14-2" tabindex="-1"></a><span class="fu">summary</span>(ridge_final)</span></code></pre></div>
-<pre><code>## Call:
-## ridgereg(formula = medv ~ ., data = train, lambda = best_lambda)
-## 
-## Lambda: 0.01 
-##                Estimate  Std. Error t value  Pr(&gt;|t|)    
-## (Intercept)  37.7287924   0.2379559  0.0000 1.0000000    
-## crim         -0.0938453   0.3235579 -2.3968 0.0170054 *  
-## zn            0.0394280   0.3631151  2.4664 0.0140725 *  
-## indus        -0.0130272   0.4738194 -0.1872 0.8515896    
-## chas1         2.2903831   0.2460765  2.4351 0.0153335 *  
-## nox         -17.1276302   0.5023944 -3.9449 9.452e-05 ***
-## rm            3.4993839   0.3294028  7.7522 7.816e-14 ***
-## age           0.0098184   0.4270618  0.6331 0.5270445    
-## dis          -1.3906212   0.4803149 -6.0309 3.765e-09 ***
-## rad           0.3308231   0.6800186  4.2904 2.248e-05 ***
-## tax          -0.0123801   0.7402102 -2.8522 0.0045706 ** 
-## ptratio      -0.9606278   0.3241719 -6.3916 4.655e-10 ***
-## b             0.0098409   0.2782958  3.3532 0.0008764 ***
-## lstat        -0.5620676   0.4215838 -9.4986 &lt; 2.2e-16 ***
-## ---
-## Signif. codes:  0 &#39;***&#39; 0.001 &#39;**&#39; 0.01 &#39;*&#39; 0.05 &#39;.&#39; 0.1 &#39; &#39; 1
-## 
-## Residual SE: 4.800579 on 393 DF</code></pre>
-<div class="sourceCode" id="cb16"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb16-1"><a href="#cb16-1" tabindex="-1"></a>pred_ridge <span class="ot">&lt;-</span> <span class="fu">predict</span>(ridge_final, <span class="at">newdata =</span> test)</span>
-<span id="cb16-2"><a href="#cb16-2" tabindex="-1"></a>rmse_ridge <span class="ot">&lt;-</span> <span class="fu">sqrt</span>(<span class="fu">mean</span>((pred_ridge <span class="sc">-</span> y_test)<span class="sc">^</span><span class="dv">2</span>))</span>
-<span id="cb16-3"><a href="#cb16-3" tabindex="-1"></a>rmse_ridge</span></code></pre></div>
-<pre><code>## [1] 4.588934</code></pre>
-<hr />
-</div>
-<div id="model-comparison" class="section level1">
-<h1>Model Comparison</h1>
-<div class="sourceCode" id="cb18"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb18-1"><a href="#cb18-1" tabindex="-1"></a>compare_df <span class="ot">&lt;-</span> <span class="fu">data.frame</span>(</span>
-<span id="cb18-2"><a href="#cb18-2" tabindex="-1"></a>  <span class="at">Model =</span> <span class="fu">c</span>(<span class="st">&quot;Linear&quot;</span>, <span class="st">&quot;Stepwise&quot;</span>, <span class="st">&quot;Ridge&quot;</span>),</span>
-<span id="cb18-3"><a href="#cb18-3" tabindex="-1"></a>  <span class="at">RMSE =</span> <span class="fu">c</span>(rmse_lm, rmse_step, rmse_ridge)</span>
+<div id="fit-and-tune-ridge-regression" class="section level1">
+<h1>Fit and Tune Ridge Regression</h1>
+<p>Now we fit our custom <code>ridgereg</code> model using the caret
+interface we defined in <code>myRidgeModel</code>. We will tune the
+<code>lambda</code> hyperparameter. We create a dense grid of 100
+<code>lambda</code> values, ranging logarithmically from <span class="math inline">\(10^{-4}\)</span> to <span class="math inline">\(10^{2}\)</span> (0.0001 to 100). Important: We do
+not use the <code>preProcess</code> argument here, because our ridgereg
+function performs its own internal standardization, as required by the
+assignment.</p>
+<div class="sourceCode" id="cb18"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb18-1"><a href="#cb18-1" tabindex="-1"></a><span class="co"># Create a dense grid of lambda values</span></span>
+<span id="cb18-2"><a href="#cb18-2" tabindex="-1"></a>lambda_grid_dense <span class="ot">&lt;-</span> <span class="fu">expand.grid</span>(</span>
+<span id="cb18-3"><a href="#cb18-3" tabindex="-1"></a>  <span class="at">lambda =</span> <span class="dv">10</span><span class="sc">^</span><span class="fu">seq</span>(<span class="sc">-</span><span class="dv">4</span>, <span class="dv">2</span>, <span class="at">length.out =</span> <span class="dv">100</span>)</span>
 <span id="cb18-4"><a href="#cb18-4" tabindex="-1"></a>)</span>
-<span id="cb18-5"><a href="#cb18-5" tabindex="-1"></a>compare_df</span></code></pre></div>
-<pre><code>##      Model     RMSE
-## 1   Linear 4.588948
-## 2 Stepwise 9.315438
-## 3    Ridge 4.588934</code></pre>
+<span id="cb18-5"><a href="#cb18-5" tabindex="-1"></a></span>
+<span id="cb18-6"><a href="#cb18-6" tabindex="-1"></a><span class="fu">cat</span>(<span class="fu">paste</span>(<span class="st">&quot;Tuning ridge regression with&quot;</span>, <span class="fu">nrow</span>(lambda_grid_dense), <span class="st">&quot;lambda values.</span><span class="sc">\n</span><span class="st">&quot;</span>))</span></code></pre></div>
+<pre><code>## Tuning ridge regression with 100 lambda values.</code></pre>
+<div class="sourceCode" id="cb20"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb20-1"><a href="#cb20-1" tabindex="-1"></a><span class="fu">cat</span>(<span class="fu">paste</span>(<span class="st">&quot;Lambda range:&quot;</span>, </span>
+<span id="cb20-2"><a href="#cb20-2" tabindex="-1"></a>          <span class="fu">format</span>(<span class="fu">min</span>(lambda_grid_dense<span class="sc">$</span>lambda), <span class="at">scientific =</span> <span class="cn">FALSE</span>), </span>
+<span id="cb20-3"><a href="#cb20-3" tabindex="-1"></a>          <span class="st">&quot;to&quot;</span>, </span>
+<span id="cb20-4"><a href="#cb20-4" tabindex="-1"></a>          <span class="fu">max</span>(lambda_grid_dense<span class="sc">$</span>lambda), <span class="st">&quot;</span><span class="sc">\n</span><span class="st">&quot;</span>))</span></code></pre></div>
+<pre><code>## Lambda range: 0.0001 to 100</code></pre>
+<div class="sourceCode" id="cb22"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb22-1"><a href="#cb22-1" tabindex="-1"></a><span class="co"># Ensure reproducibility</span></span>
+<span id="cb22-2"><a href="#cb22-2" tabindex="-1"></a><span class="fu">set.seed</span>(<span class="dv">123</span>)</span>
+<span id="cb22-3"><a href="#cb22-3" tabindex="-1"></a>model_ridge <span class="ot">&lt;-</span> caret<span class="sc">::</span><span class="fu">train</span>(</span>
+<span id="cb22-4"><a href="#cb22-4" tabindex="-1"></a>  medv <span class="sc">~</span> .,</span>
+<span id="cb22-5"><a href="#cb22-5" tabindex="-1"></a>  <span class="at">data =</span> trainData,</span>
+<span id="cb22-6"><a href="#cb22-6" tabindex="-1"></a>  <span class="at">method =</span> myRidgeModel,  <span class="co"># Our custom model interface</span></span>
+<span id="cb22-7"><a href="#cb22-7" tabindex="-1"></a>  <span class="at">trControl =</span> trControl,</span>
+<span id="cb22-8"><a href="#cb22-8" tabindex="-1"></a>  <span class="at">tuneGrid =</span> lambda_grid_dense</span>
+<span id="cb22-9"><a href="#cb22-9" tabindex="-1"></a>)</span>
+<span id="cb22-10"><a href="#cb22-10" tabindex="-1"></a></span>
+<span id="cb22-11"><a href="#cb22-11" tabindex="-1"></a><span class="co"># Print the results</span></span>
+<span id="cb22-12"><a href="#cb22-12" tabindex="-1"></a><span class="fu">print</span>(model_ridge)</span></code></pre></div>
+<pre><code>## 407 samples
+##  13 predictor
+## 
+## No pre-processing
+## Resampling: Cross-Validated (10 fold) 
+## Summary of sample sizes: 366, 367, 366, 366, 366, 366, ... 
+## Resampling results across tuning parameters:
+## 
+##   lambda        RMSE      Rsquared   MAE     
+##   1.000000e-04  4.818679  0.7360525  3.408799
+##   1.149757e-04  4.818679  0.7360525  3.408799
+##   1.321941e-04  4.818679  0.7360526  3.408799
+##   1.519911e-04  4.818679  0.7360526  3.408799
+##   1.747528e-04  4.818679  0.7360526  3.408798
+##   2.009233e-04  4.818679  0.7360526  3.408798
+##   2.310130e-04  4.818679  0.7360526  3.408798
+##   2.656088e-04  4.818679  0.7360526  3.408798
+##   3.053856e-04  4.818679  0.7360526  3.408797
+##   3.511192e-04  4.818679  0.7360526  3.408797
+##   4.037017e-04  4.818679  0.7360526  3.408797
+##   4.641589e-04  4.818678  0.7360526  3.408796
+##   5.336699e-04  4.818678  0.7360526  3.408796
+##   6.135907e-04  4.818678  0.7360526  3.408795
+##   7.054802e-04  4.818678  0.7360526  3.408794
+##   8.111308e-04  4.818678  0.7360526  3.408793
+##   9.326033e-04  4.818678  0.7360526  3.408792
+##   1.072267e-03  4.818677  0.7360526  3.408791
+##   1.232847e-03  4.818677  0.7360527  3.408790
+##   1.417474e-03  4.818677  0.7360527  3.408789
+##   1.629751e-03  4.818676  0.7360527  3.408787
+##   1.873817e-03  4.818676  0.7360527  3.408785
+##   2.154435e-03  4.818675  0.7360527  3.408783
+##   2.477076e-03  4.818675  0.7360528  3.408781
+##   2.848036e-03  4.818674  0.7360528  3.408778
+##   3.274549e-03  4.818673  0.7360529  3.408774
+##   3.764936e-03  4.818672  0.7360529  3.408771
+##   4.328761e-03  4.818671  0.7360530  3.408766
+##   4.977024e-03  4.818670  0.7360530  3.408761
+##   5.722368e-03  4.818669  0.7360531  3.408756
+##   6.579332e-03  4.818667  0.7360532  3.408749
+##   7.564633e-03  4.818665  0.7360533  3.408741
+##   8.697490e-03  4.818663  0.7360534  3.408733
+##   1.000000e-02  4.818661  0.7360535  3.408722
+##   1.149757e-02  4.818658  0.7360536  3.408711
+##   1.321941e-02  4.818655  0.7360538  3.408698
+##   1.519911e-02  4.818652  0.7360540  3.408682
+##   1.747528e-02  4.818647  0.7360542  3.408665
+##   2.009233e-02  4.818643  0.7360545  3.408645
+##   2.310130e-02  4.818637  0.7360548  3.408621
+##   2.656088e-02  4.818631  0.7360551  3.408595
+##   3.053856e-02  4.818624  0.7360555  3.408564
+##   3.511192e-02  4.818615  0.7360559  3.408529
+##   4.037017e-02  4.818606  0.7360564  3.408488
+##   4.641589e-02  4.818595  0.7360570  3.408442
+##   5.336699e-02  4.818583  0.7360576  3.408388
+##   6.135907e-02  4.818568  0.7360583  3.408327
+##   7.054802e-02  4.818552  0.7360592  3.408256
+##   8.111308e-02  4.818533  0.7360602  3.408175
+##   9.326033e-02  4.818511  0.7360613  3.408081
+##   1.072267e-01  4.818487  0.7360626  3.407974
+##   1.232847e-01  4.818459  0.7360640  3.407851
+##   1.417474e-01  4.818426  0.7360656  3.407709
+##   1.629751e-01  4.818390  0.7360675  3.407546
+##   1.873817e-01  4.818348  0.7360696  3.407359
+##   2.154435e-01  4.818300  0.7360720  3.407145
+##   2.477076e-01  4.818246  0.7360747  3.406898
+##   2.848036e-01  4.818184  0.7360777  3.406615
+##   3.274549e-01  4.818114  0.7360811  3.406291
+##   3.764936e-01  4.818036  0.7360849  3.405918
+##   4.328761e-01  4.817947  0.7360891  3.405491
+##   4.977024e-01  4.817847  0.7360937  3.405002
+##   5.722368e-01  4.817735  0.7360987  3.404440
+##   6.579332e-01  4.817611  0.7361042  3.403797
+##   7.564633e-01  4.817473  0.7361100  3.403061
+##   8.697490e-01  4.817322  0.7361161  3.402219
+##   1.000000e+00  4.817156  0.7361224  3.401256
+##   1.149757e+00  4.816976  0.7361286  3.400156
+##   1.321941e+00  4.816784  0.7361346  3.398900
+##   1.519911e+00  4.816581  0.7361398  3.397480
+##   1.747528e+00  4.816371  0.7361439  3.395944
+##   2.009233e+00  4.816158  0.7361462  3.394259
+##   2.310130e+00  4.815950  0.7361456  3.392345
+##   2.656088e+00  4.815757  0.7361411  3.390207
+##   3.053856e+00  4.815590  0.7361312  3.387865
+##   3.511192e+00  4.815467  0.7361140  3.385331
+##   4.037017e+00  4.815408  0.7360874  3.382568
+##   4.641589e+00  4.815440  0.7360485  3.379530
+##   5.336699e+00  4.815595  0.7359941  3.376423
+##   6.135907e+00  4.815911  0.7359205  3.373225
+##   7.054802e+00  4.816432  0.7358233  3.370115
+##   8.111308e+00  4.817212  0.7356976  3.367190
+##   9.326033e+00  4.818309  0.7355378  3.363941
+##   1.072267e+01  4.819790  0.7353381  3.360407
+##   1.232847e+01  4.821732  0.7350920  3.356487
+##   1.417474e+01  4.824215  0.7347927  3.352652
+##   1.629751e+01  4.827333  0.7344330  3.349359
+##   1.873817e+01  4.831187  0.7340053  3.346986
+##   2.154435e+01  4.835888  0.7335018  3.345911
+##   2.477076e+01  4.841563  0.7329142  3.345304
+##   2.848036e+01  4.848354  0.7322335  3.345216
+##   3.274549e+01  4.856422  0.7314501  3.346025
+##   3.764936e+01  4.865954  0.7305533  3.346809
+##   4.328761e+01  4.877166  0.7295310  3.348894
+##   4.977024e+01  4.890309  0.7283693  3.353634
+##   5.722368e+01  4.905673  0.7270520  3.360018
+##   6.579332e+01  4.923594  0.7255599  3.367735
+##   7.564633e+01  4.944457  0.7238703  3.378978
+##   8.697490e+01  4.968696  0.7219564  3.393092
+##   1.000000e+02  4.996796  0.7197867  3.411633
+## 
+## RMSE was used to select the optimal model using the smallest value.
+## The final value used for the model was lambda = 4.037017.</code></pre>
+<p>We can plot the RMSE across the range of <code>lambda</code> values
+(on a log scale) to find the optimal tuning parameter.</p>
+<div class="sourceCode" id="cb24"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb24-1"><a href="#cb24-1" tabindex="-1"></a><span class="fu">plot</span>(model_ridge, <span class="at">main =</span> <span class="st">&quot;RMSE vs. log(Lambda)&quot;</span>,<span class="at">cex.main =</span> <span class="fl">0.1</span>)</span></code></pre></div>
+<p><img role="img" src="data:image/png;base64,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" width="70%" style="display: block; margin: auto;" />
+The best lambda value found during cross-validation is:</p>
+<div class="sourceCode" id="cb25"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb25-1"><a href="#cb25-1" tabindex="-1"></a><span class="fu">cat</span>(<span class="fu">paste</span>(<span class="st">&quot;Best lambda:&quot;</span>, model_ridge<span class="sc">$</span>bestTune<span class="sc">$</span>lambda, <span class="st">&quot;</span><span class="sc">\n</span><span class="st">&quot;</span>))</span></code></pre></div>
+<pre><code>## Best lambda: 4.03701725859656</code></pre>
+<div class="sourceCode" id="cb27"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb27-1"><a href="#cb27-1" tabindex="-1"></a>best_rmse_ridge <span class="ot">&lt;-</span> <span class="fu">min</span>(model_ridge<span class="sc">$</span>results<span class="sc">$</span>RMSE)</span>
+<span id="cb27-2"><a href="#cb27-2" tabindex="-1"></a><span class="fu">cat</span>(<span class="fu">paste</span>(<span class="st">&quot;Corresponding RMSE:&quot;</span>, best_rmse_ridge, <span class="st">&quot;</span><span class="sc">\n</span><span class="st">&quot;</span>))</span></code></pre></div>
+<pre><code>## Corresponding RMSE: 4.81540823736812</code></pre>
+<p>The output table and the RMSE vs. log(Lambda) plot reveal a ridge
+tuning pattern:<br />
+–When <code>lambda</code> is extremely small (e.g., <span class="math inline">\(10^{-4}\)</span>), the RMSE is 4.818679, which is
+identical to the standard Linear Model (model_lm). This is the correct
+behavior, as a penalty of (near) zero makes ridge regression equivalent
+to OLS.<br />
+–As the penalty <code>lambda</code> increases, the CV RMSE slightly
+decreases. This indicates that applying a small amount of shrinkage
+(penalizing large coefficients) improves the model’s predictive
+performance on unseen data by reducing variance.<br />
+–The optimal model was found at <code>lambda = 4.037</code>, which
+achieved the minimum CV RMSE of 4.815.<br />
+–As <code>lambda</code> continues to increase past this optimal point,
+the plot shows the RMSE rising again (e.g., 4.997 at lambda=100). This
+indicates underfitting, where the penalty is too strong and introduces
+excessive bias into the model.</p>
 <hr />
 </div>
-<div id="ridge-regression-model-visualization-ridgereg-version" class="section level1">
-<h1>Ridge Regression Model Visualization (ridgereg version)</h1>
-<p>This section provides visual insights about the ridge regression
-model using <strong>my own ridgereg()</strong> implementation.</p>
-<hr />
-<div id="coefficient-shrinkage-path" class="section level2">
-<h2>1. Coefficient Shrinkage Path</h2>
-<div class="sourceCode" id="cb20"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb20-1"><a href="#cb20-1" tabindex="-1"></a><span class="fu">set.seed</span>(<span class="dv">123</span>)</span>
-<span id="cb20-2"><a href="#cb20-2" tabindex="-1"></a>lambdas <span class="ot">&lt;-</span> <span class="fu">c</span>(<span class="fl">0.001</span>, <span class="fl">0.01</span>, <span class="fl">0.1</span>, <span class="dv">1</span>, <span class="dv">10</span>, <span class="dv">100</span>)</span>
-<span id="cb20-3"><a href="#cb20-3" tabindex="-1"></a>coef_mat <span class="ot">&lt;-</span> <span class="cn">NULL</span></span>
-<span id="cb20-4"><a href="#cb20-4" tabindex="-1"></a></span>
-<span id="cb20-5"><a href="#cb20-5" tabindex="-1"></a><span class="cf">for</span> (lam <span class="cf">in</span> lambdas) {</span>
-<span id="cb20-6"><a href="#cb20-6" tabindex="-1"></a>  model <span class="ot">&lt;-</span> <span class="fu">ridgereg</span>(medv <span class="sc">~</span> ., <span class="at">data =</span> train, <span class="at">lambda =</span> lam)</span>
-<span id="cb20-7"><a href="#cb20-7" tabindex="-1"></a>  coefs <span class="ot">&lt;-</span> <span class="fu">coef</span>(model)</span>
-<span id="cb20-8"><a href="#cb20-8" tabindex="-1"></a>  coef_mat <span class="ot">&lt;-</span> <span class="fu">rbind</span>(coef_mat, coefs)</span>
-<span id="cb20-9"><a href="#cb20-9" tabindex="-1"></a>}</span>
-<span id="cb20-10"><a href="#cb20-10" tabindex="-1"></a><span class="fu">rownames</span>(coef_mat) <span class="ot">&lt;-</span> <span class="fu">paste0</span>(<span class="st">&quot;λ=&quot;</span>, lambdas)</span>
-<span id="cb20-11"><a href="#cb20-11" tabindex="-1"></a></span>
-<span id="cb20-12"><a href="#cb20-12" tabindex="-1"></a><span class="fu">matplot</span>(<span class="fu">t</span>(coef_mat[, <span class="sc">-</span><span class="dv">1</span>]), <span class="at">type =</span> <span class="st">&quot;l&quot;</span>, <span class="at">lty =</span> <span class="dv">1</span>, <span class="at">lwd =</span> <span class="dv">2</span>,</span>
-<span id="cb20-13"><a href="#cb20-13" tabindex="-1"></a>        <span class="at">xlab =</span> <span class="st">&quot;Coefficient Index&quot;</span>, <span class="at">ylab =</span> <span class="st">&quot;Coefficient Value&quot;</span>,</span>
-<span id="cb20-14"><a href="#cb20-14" tabindex="-1"></a>        <span class="at">main =</span> <span class="st">&quot;Ridge Coefficient Paths (ridgereg)&quot;</span>)</span>
-<span id="cb20-15"><a href="#cb20-15" tabindex="-1"></a><span class="fu">legend</span>(<span class="st">&quot;topright&quot;</span>, <span class="at">legend =</span> <span class="fu">rownames</span>(coef_mat), <span class="at">col =</span> <span class="dv">1</span><span class="sc">:</span><span class="dv">6</span>, <span class="at">lty =</span> <span class="dv">1</span>, <span class="at">cex =</span> <span class="fl">0.8</span>)</span></code></pre></div>
-<p><img role="img" src="data:image/png;base64,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" /><!-- --></p>
-<p><em>Interpretation:</em> As λ increases, the ridge penalty shrinks
-coefficients toward zero, demonstrating regularization.</p>
-<hr />
-</div>
-<div id="cross-validation-curve-10-fold-rmse" class="section level2">
-<h2>2. Cross-Validation Curve (10-Fold RMSE)</h2>
-<div class="sourceCode" id="cb21"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb21-1"><a href="#cb21-1" tabindex="-1"></a><span class="fu">plot</span>(cv_results<span class="sc">$</span>lambda, cv_results<span class="sc">$</span>RMSE, <span class="at">type =</span> <span class="st">&quot;b&quot;</span>, <span class="at">pch =</span> <span class="dv">19</span>, <span class="at">col =</span> <span class="st">&quot;steelblue&quot;</span>,</span>
-<span id="cb21-2"><a href="#cb21-2" tabindex="-1"></a>     <span class="at">xlab =</span> <span class="fu">expression</span>(lambda), <span class="at">ylab =</span> <span class="st">&quot;Average RMSE (10-fold CV)&quot;</span>,</span>
-<span id="cb21-3"><a href="#cb21-3" tabindex="-1"></a>     <span class="at">main =</span> <span class="st">&quot;Ridge CV Curve (ridgereg)&quot;</span>)</span>
-<span id="cb21-4"><a href="#cb21-4" tabindex="-1"></a><span class="fu">points</span>(best_lambda, <span class="fu">min</span>(cv_results<span class="sc">$</span>RMSE), <span class="at">col =</span> <span class="st">&quot;red&quot;</span>, <span class="at">pch =</span> <span class="dv">19</span>, <span class="at">cex =</span> <span class="fl">1.2</span>)</span>
-<span id="cb21-5"><a href="#cb21-5" tabindex="-1"></a><span class="fu">text</span>(best_lambda, <span class="fu">min</span>(cv_results<span class="sc">$</span>RMSE), <span class="at">labels =</span> <span class="fu">paste0</span>(<span class="st">&quot;Best λ=&quot;</span>, best_lambda), <span class="at">pos =</span> <span class="dv">3</span>, <span class="at">col =</span> <span class="st">&quot;red&quot;</span>)</span></code></pre></div>
-<p><img role="img" src="data:image/png;base64,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" /><!-- --></p>
-<p><em>Interpretation:</em> The red point marks the λ with the lowest
-RMSE from 10-fold cross-validation.</p>
-<hr />
-</div>
-<div id="predicted-vs-actual-values" class="section level2">
-<h2>3. Predicted vs Actual Values</h2>
-<div class="sourceCode" id="cb22"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb22-1"><a href="#cb22-1" tabindex="-1"></a><span class="fu">plot</span>(y_test, pred_ridge, <span class="at">pch =</span> <span class="dv">19</span>, <span class="at">col =</span> <span class="st">&quot;steelblue&quot;</span>,</span>
-<span id="cb22-2"><a href="#cb22-2" tabindex="-1"></a>     <span class="at">xlab =</span> <span class="st">&quot;Actual MEDV&quot;</span>, <span class="at">ylab =</span> <span class="st">&quot;Predicted MEDV&quot;</span>,</span>
-<span id="cb22-3"><a href="#cb22-3" tabindex="-1"></a>     <span class="at">main =</span> <span class="st">&quot;Ridge Regression (ridgereg): Actual vs Predicted&quot;</span>)</span>
-<span id="cb22-4"><a href="#cb22-4" tabindex="-1"></a><span class="fu">abline</span>(<span class="dv">0</span>, <span class="dv">1</span>, <span class="at">col =</span> <span class="st">&quot;red&quot;</span>, <span class="at">lty =</span> <span class="dv">2</span>, <span class="at">lwd =</span> <span class="dv">2</span>)</span></code></pre></div>
-<p><img role="img" src="data:image/png;base64,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" /><!-- --></p>
-<p><em>Interpretation:</em> The closer the blue points are to the red
-diagonal line, the better the model fits the data.</p>
-</div>
+<div id="final-model-evaluation-on-the-test-set" class="section level1">
+<h1>Final Model Evaluation on the Test Set</h1>
+<p>We use the <code>testData</code> set, which the models have never
+seen before, to get an unbiased estimate of their real-world
+performance. We create a summary table comparing the Cross-Validation
+RMSE (from the training set) to the final RMSE on the test set.</p>
+<div class="sourceCode" id="cb29"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb29-1"><a href="#cb29-1" tabindex="-1"></a><span class="co"># 1. Make predictions on the test set</span></span>
+<span id="cb29-2"><a href="#cb29-2" tabindex="-1"></a>pred_lm <span class="ot">&lt;-</span> <span class="fu">predict</span>(model_lm, testData)</span>
+<span id="cb29-3"><a href="#cb29-3" tabindex="-1"></a>pred_fwd <span class="ot">&lt;-</span> <span class="fu">predict</span>(model_fwd, testData)</span>
+<span id="cb29-4"><a href="#cb29-4" tabindex="-1"></a>pred_ridge <span class="ot">&lt;-</span> <span class="fu">predict</span>(model_ridge, testData)</span>
+<span id="cb29-5"><a href="#cb29-5" tabindex="-1"></a></span>
+<span id="cb29-6"><a href="#cb29-6" tabindex="-1"></a><span class="co"># 2. Get performance metrics on test set</span></span>
+<span id="cb29-7"><a href="#cb29-7" tabindex="-1"></a><span class="co"># postResample gives RMSE, Rsquared, and MAE</span></span>
+<span id="cb29-8"><a href="#cb29-8" tabindex="-1"></a>res_lm <span class="ot">&lt;-</span> <span class="fu">postResample</span>(<span class="at">pred =</span> pred_lm, <span class="at">obs =</span> testData<span class="sc">$</span>medv)</span>
+<span id="cb29-9"><a href="#cb29-9" tabindex="-1"></a>res_fwd <span class="ot">&lt;-</span> <span class="fu">postResample</span>(<span class="at">pred =</span> pred_fwd, <span class="at">obs =</span> testData<span class="sc">$</span>medv)</span>
+<span id="cb29-10"><a href="#cb29-10" tabindex="-1"></a>res_ridge <span class="ot">&lt;-</span> <span class="fu">postResample</span>(<span class="at">pred =</span> pred_ridge, <span class="at">obs =</span> testData<span class="sc">$</span>medv)</span>
+<span id="cb29-11"><a href="#cb29-11" tabindex="-1"></a></span>
+<span id="cb29-12"><a href="#cb29-12" tabindex="-1"></a><span class="co"># 3. Get the best CV RMSE from our previous models</span></span>
+<span id="cb29-13"><a href="#cb29-13" tabindex="-1"></a>cv_rmse_lm <span class="ot">&lt;-</span> model_lm<span class="sc">$</span>results<span class="sc">$</span>RMSE</span>
+<span id="cb29-14"><a href="#cb29-14" tabindex="-1"></a>cv_rmse_fwd <span class="ot">&lt;-</span> <span class="fu">min</span>(model_fwd<span class="sc">$</span>results<span class="sc">$</span>RMSE)</span>
+<span id="cb29-15"><a href="#cb29-15" tabindex="-1"></a>cv_rmse_ridge <span class="ot">&lt;-</span> <span class="fu">min</span>(model_ridge<span class="sc">$</span>results<span class="sc">$</span>RMSE)</span>
+<span id="cb29-16"><a href="#cb29-16" tabindex="-1"></a></span>
+<span id="cb29-17"><a href="#cb29-17" tabindex="-1"></a><span class="co"># 4. Combine into a summary data.frame</span></span>
+<span id="cb29-18"><a href="#cb29-18" tabindex="-1"></a>summary_table <span class="ot">&lt;-</span> <span class="fu">data.frame</span>(</span>
+<span id="cb29-19"><a href="#cb29-19" tabindex="-1"></a>  <span class="st">&quot;CV RMSE (Train)&quot;</span> <span class="ot">=</span> <span class="fu">c</span>(cv_rmse_lm, cv_rmse_fwd, cv_rmse_ridge),</span>
+<span id="cb29-20"><a href="#cb29-20" tabindex="-1"></a>  <span class="st">&quot;Test RMSE&quot;</span> <span class="ot">=</span> <span class="fu">c</span>(res_lm[<span class="st">&quot;RMSE&quot;</span>], res_fwd[<span class="st">&quot;RMSE&quot;</span>], res_ridge[<span class="st">&quot;RMSE&quot;</span>]),</span>
+<span id="cb29-21"><a href="#cb29-21" tabindex="-1"></a>  <span class="st">&quot;Test Rsquared&quot;</span> <span class="ot">=</span> <span class="fu">c</span>(res_lm[<span class="st">&quot;Rsquared&quot;</span>], res_fwd[<span class="st">&quot;Rsquared&quot;</span>], res_ridge[<span class="st">&quot;Rsquared&quot;</span>])</span>
+<span id="cb29-22"><a href="#cb29-22" tabindex="-1"></a>)</span>
+<span id="cb29-23"><a href="#cb29-23" tabindex="-1"></a><span class="fu">rownames</span>(summary_table) <span class="ot">&lt;-</span> <span class="fu">c</span>(<span class="st">&quot;Linear Model (LM)&quot;</span>, <span class="st">&quot;Forward Selection&quot;</span>, <span class="st">&quot;Ridge (liu.ridgereg)&quot;</span>)</span>
+<span id="cb29-24"><a href="#cb29-24" tabindex="-1"></a></span>
+<span id="cb29-25"><a href="#cb29-25" tabindex="-1"></a><span class="co"># 5. Print the final comparison table</span></span>
+<span id="cb29-26"><a href="#cb29-26" tabindex="-1"></a><span class="fu">cat</span>(<span class="st">&quot;Final Model Performance Comparison:</span><span class="sc">\n\n</span><span class="st">&quot;</span>)</span></code></pre></div>
+<pre><code>## Final Model Performance Comparison:</code></pre>
+<div class="sourceCode" id="cb31"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb31-1"><a href="#cb31-1" tabindex="-1"></a><span class="fu">print</span>(summary_table, <span class="at">digits =</span> <span class="dv">4</span>)</span></code></pre></div>
+<pre><code>##                      CV.RMSE..Train. Test.RMSE Test.Rsquared
+## Linear Model (LM)              4.819     4.589        0.7611
+## Forward Selection              4.807     4.561        0.7646
+## Ridge (liu.ridgereg)           4.815     4.588        0.7628</code></pre>
+<p><strong>Concluding Comments:</strong><br />
+–<strong>Final Rankings</strong>: The rankings on the test set
+are:<br />
+1st: Forward Selection (Test RMSE = 4.561)<br />
+2nd: Ridge (liu.ridgereg) (Test RMSE = 4.588)<br />
+3rd: Linear Model (LM) (Test RMSE = 4.589)<br />
+–<strong>Conclusion</strong>: The Forward Selection model has the best
+performance in cross-validation (CV RMSE 4.807) and this translated into
+the best performance on the final test set (Test RMSE 4.561).<br />
+–<strong>ridgereg Performance</strong>: Our custom ridgereg function
+performed as intended. Its Test RMSE of 4.588 was an improvement,
+however slight, over the standard Linear Model’s 4.589. This
+demonstrates that applying a small shrinkage penalty (lambda = 4.037)
+provided a small but real regularization benefit, improving the model’s
+ability to generalize.<br />
+–<strong>CV vs. Test</strong>: All three models performed better on the
+test set than their average CV RMSE from the training set. This suggests
+our 20% test split was, by chance, slightly easier to predict than the
+training folds. The most important finding is that the relative ranking
+of the models (Forward &gt; Ridge &gt; LM) remained consistent between
+training and testing, giving us high confidence in our model selection
+process.<br />
+In summary, while the performance differences are small, our analysis
+shows that regularization (both via variable selection and L2 shrinkage)
+provided a measurable benefit for this dataset.</p>
 </div>
 
 

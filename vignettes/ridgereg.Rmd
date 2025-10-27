@@ -1,194 +1,237 @@
 ---
-title: "Predictive modeling with ridgereg (BostonHousing)"
-output: rmarkdown::html_vignette
+title: "Predictive Modeling with liu.ridgereg (BostonHousing)"
+output: 
+  rmarkdown::html_vignette:
+    self_contained: true
 vignette: >
-  %\VignetteIndexEntry{Predictive modeling with ridgereg (BostonHousing)}
+  %\VignetteIndexEntry{Predictive Modeling with liu.ridgereg (BostonHousing)}
   %\VignetteEngine{knitr::rmarkdown}
   %\VignetteEncoding{UTF-8}
 ---
 
 ```{r setup, include=FALSE}
-library(liu.ridgereg)
-library(caret)
-library(dplyr)
-library(mlbench)
-library(MASS)
-library(ggplot2)
-library(glmnet)
+library(liu.ridgereg) # Our custom package
+library(caret)        # For model training and evaluation
+library(mlbench)      # For the BostonHousing dataset
+library(dplyr)        # For data manipulation
+library(ggplot2)      # For plotting
+source("caret_interface.R", local = TRUE)
 set.seed(123)
 ```
 
 # Introduction
 
-This vignette demonstrates how to use the **`ridgereg()`** function (implemented in this package) for predictive modeling with the **BostonHousing** dataset from the `mlbench` package. We compare three regression approaches and provide comprehensive model diagnostics and visualization.
+This vignette demonstrates how to use the **`ridgereg()`** for a predictive modeling task. We will compare the performance of our custom **`ridgereg()`** function against a standard Linear Model (LM) and a Linear Model with Forward Selection.
 
-We compare three models:
-
-1. Ordinary Linear Regression (`lm`)
-2. Stepwise Linear Regression (`stepAIC`)
-3. Ridge Regression (`ridgereg`) with cross-validated λ
+We will use the `caret` package to streamline the process of data splitting, model training (including cross-validation), and evaluation. The dataset for this analysis is the `BostonHousing` dataset from the `mlbench` package.
 
 ---
 
 # Data Preparation
 
+First, we load the `BostonHousing` data. We then set a random seed (`set.seed(123)`) to ensure that our data split is reproducible. We partition the data using `createDataPartition` from the caret package, allocating 80% of the data for training and the remaining 20% for testing.
+
+We also define our cross-validation strategy using `trainControl`. We will use 10-fold cross-validation (`method = "cv", number = 10`) to tune our models.
+
 ```{r data-prep}
-data("BostonHousing", package = "mlbench")
+# Load the dataset
+data(BostonHousing, package = "mlbench")
 
-# Split training/testing sets
-train_index <- createDataPartition(BostonHousing$medv, p = 0.8, list = FALSE)
-train <- BostonHousing[train_index, ]
-test  <- BostonHousing[-train_index, ]
+# Ensure reproducibility for the data split
+set.seed(123) 
+trainIndex <- createDataPartition(BostonHousing$medv, p = 0.8, list = FALSE)
 
-# Features and target
-y_train <- train$medv
-y_test  <- test$medv
+# Create training and testing sets
+trainData <- BostonHousing[trainIndex, ]
+testData  <- BostonHousing[-trainIndex, ]
 
-cat("Training set size:", nrow(train), "\n")
-cat("Testing set size:", nrow(test), "\n")
+cat("Training data rows:", nrow(trainData), "\n")
+cat("Testing data rows:", nrow(testData), "\n")
+
+# Set up 10-fold cross-validation
+trControl <- trainControl(
+  method = "cv",    # Cross-Validation
+  number = 10       # 10 folds
+)
 ```
 
 ---
 
-# 1. Ordinary Linear Regression
+# Fit Linear Models
+
+## Standard Linear Regression (LM)
+
+We fit a standard linear regression model using all available predictors. Because ridge regression is sensitive to the scale of predictors, we must standardize (center and scale) our predictors here for a fair comparison. caret handles this via the preProcess argument.
 
 ```{r lm-fit}
-lm_model <- lm(medv ~ ., data = train)
-summary(lm_model)
-
-# Prediction and RMSE
-pred_lm <- predict(lm_model, newdata = test)
-rmse_lm <- sqrt(mean((pred_lm - y_test)^2))
-rmse_lm
-```
-
----
-
-# 2. Stepwise Linear Regression (Forward Selection)
-
-```{r stepwise}
-step_model <- stepAIC(lm(medv ~ 1, data = train),
-                      scope = list(lower = ~1, upper = ~.),
-                      direction = "forward",
-                      trace = FALSE)
-summary(step_model)
-
-pred_step <- predict(step_model, newdata = test)
-rmse_step <- sqrt(mean((pred_step - y_test)^2))
-
-cat("Stepwise Regression RMSE:", round(rmse_step, 3), "\n")
-```
-
----
-
-# 3. Ridge Regression with Cross-Validation
-
-We test λ = {0.01, 0.1, 1, 10, 100} and use 10-fold CV to find the best λ.
-
-```{r ridge-viz-cv-plot}
-lambdas <- c(0.01, 0.1, 1, 10, 100)
-cv_results <- data.frame(lambda = lambdas, RMSE = NA)
-
-for (i in seq_along(lambdas)) {
-  lambda_val <- lambdas[i]
-  folds <- createFolds(train$medv, k = 10, list = TRUE)
-  fold_rmse <- numeric(length(folds))
-  
-  for (j in seq_along(folds)) {
-    fold_train <- train[-folds[[j]], ]
-    fold_test  <- train[folds[[j]], ]
-    model <- ridgereg(medv ~ ., data = fold_train, lambda = lambda_val)
-    pred  <- predict(model, newdata = fold_test)
-    fold_rmse[j] <- sqrt(mean((pred - fold_test$medv)^2))
-  }
-  cv_results$RMSE[i] <- mean(fold_rmse)
-}
-
-print(cv_results)
-best_lambda <- cv_results$lambda[which.min(cv_results$RMSE)]
-cat("Best lambda from CV:", best_lambda, "\n")
-```
-
----
-
-# 4. Final Ridge Model and Evaluation
-
-```{r final-ridge}
-ridge_final <- ridgereg(medv ~ ., data = train, lambda = best_lambda)
-summary(ridge_final)
-
-pred_ridge <- predict(ridge_final, newdata = test)
-rmse_ridge <- sqrt(mean((pred_ridge - y_test)^2))
-
-cat("Ridge Regression RMSE:", round(rmse_ridge, 3), "\n")
-```
-
----
-
-# Model Comparison
-
-```{r compare}
-compare_df <- data.frame(
-  Model = c("Linear", "Stepwise", "Ridge"),
-  RMSE = c(rmse_lm, rmse_step, rmse_ridge)
+# Ensure reproducibility for CV folds
+set.seed(123) 
+model_lm <- caret::train(
+  medv ~ .,
+  data = trainData,
+  method = "lm",
+  trControl = trControl,
+  preProcess = c("center", "scale") # Standardize predictors
 )
 
-print(compare_df)
+# Print the CV results
+print(model_lm)
+```
 
-# Visual comparison
-ggplot(compare_df, aes(x = Model, y = RMSE, fill = Model)) +
-  geom_bar(stat = "identity", alpha = 0.8) +
-  geom_text(aes(label = round(RMSE, 3)), vjust = -0.5) +
-  theme_minimal() +
-  labs(title = "Model Comparison by RMSE",
-       subtitle = "Lower RMSE indicates better performance") +
-  scale_fill_brewer(palette = "Set2")
+## Linear Regression with Forward Selection
+
+Next, we fit a linear model using forward selection (`method = "leapForward"`). This method treats the number of predictors (`nvmax`) as a tuning parameter. We create a `tuneGrid` to test all possible numbers of predictors, from 1 to 13 (the total number of predictors for this case).
+
+```{r forward selection}
+# Define the tuning grid: test models from 1 to p variables
+p <- ncol(trainData) - 1 # p = 13 predictors
+fwd_grid <- expand.grid(nvmax = 1:p)
+
+# Ensure reproducibility
+set.seed(123) 
+model_fwd <- caret::train(
+  medv ~ .,
+  data = trainData,
+  method = "leapForward",
+  trControl = trControl,
+  preProcess = c("center", "scale"), # Standardize predictors
+  tuneGrid = fwd_grid               # Tune the number of variables
+)
+
+# Print the results
+print(model_fwd)
+```
+
+We can plot the cross-validation error (RMSE) as a function of the number of variables included in the model.
+```{r plot1, out.width="70%", fig.align='center'}
+plot(model_fwd, main = "RMSE vs. Number of Variables",cex.main = 0.1)
+```
+
+As the figure shown above, the cross-validated RMSE consistently decreases as we add more variables, dropping sharply from 6.08 (1 variable) to 5.01 (6 variables). The optimal model, as determined by the lowest RMSE, is the one with nvmax = 11 variables, which achieved an RMSE of 4.807. Adding the 12th and 13th variables causes the RMSE to slightly increase (to 4.816 and 4.819, respectively). This value for nvmax = 13 (4.819) correctly matches the RMSE of our standard linear model (model_lm), which uses all 13 predictors. This slight increase suggests that the full model is marginally overfit, and a 11-variable model provides slightly better predictive accuracy on this training data.
+
+We can also extract the variables selected by the best-performing model.
+```{r extract variables}
+best_nvmax <- model_fwd$bestTune$nvmax
+# Get coefficients from the final model (which is a 'regsubsets' object)
+best_coefs <- coef(model_fwd$finalModel, id = best_nvmax)
+cat("Selected variables:\n")
+print(names(best_coefs))
 ```
 
 ---
 
-# Conclusion
+# Evaluate Performance on Training Set
+We can now compare the cross-validation performance of above two models. The `resamples` function collects the CV results from models trained with the same resampling indices, allowing for a direct comparison.
+```{r base-line-evaluate}
+models_list_base <- list(
+  LM = model_lm,
+  Forward = model_fwd
+)
+cv_results_base <- resamples(models_list_base)
+# Show summary of CV statistics
+summary(cv_results_base)
+```
 
-* The ridge regression model introduces a penalty term that stabilizes coefficient estimates and helps prevent overfitting.
-* Using cross-validation, we select the λ that minimizes test RMSE.
-* Comparing RMSEs, the best-performing model can be identified for this dataset.
+The `summary(cv_results_base)` table provides the numerical details for our 10-fold cross-validation. The full Linear Model (LM) had a mean CV RMSE of 4.819, while the 11-variable Forward Selection model had a mean CV RMSE of 4.807.
+
+A boxplot provides a clear visual comparison of the distribution of RMSE values from the 10-fold cross-validation for each model.
+```{r boxplot, out.width="70%", fig.align='center'}
+bwplot(cv_results_base, 
+       metric = "RMSE",
+       cex = 0.7)
+```
+Above boxplot visually confirms our finding. The entire distribution of cross-validation errors for the 'Forward' model—including its median (black dot) and interquartile range (the box)—is shifted slightly to the left (indicating a lower RMSE) compared to the 'LM'.
+While the performance difference is very small (approx. 0.012), it reinforces our earlier conclusion: the 11-variable model selected by forward selection is slightly more robust and less overfit than the full 13-variable model.
 
 ---
 
+# Fit and Tune Ridge Regression
+Now we fit our custom `ridgereg` model using the caret interface we defined in `myRidgeModel`.
+We will tune the `lambda` hyperparameter. We create a dense grid of 100 `lambda` values, ranging logarithmically from $10^{-4}$ to $10^{2}$ (0.0001 to 100).
+Important: We do not use the `preProcess` argument here, because our ridgereg function performs its own internal standardization, as required by the assignment.
 
-# Ridge Regression Model Visualization
+```{r ridgereg}
+# Create a dense grid of lambda values
+lambda_grid_dense <- expand.grid(
+  lambda = 10^seq(-4, 2, length.out = 100)
+)
 
-This section provides three visual insights about the ridge regression model's structure and performance.
+cat(paste("Tuning ridge regression with", nrow(lambda_grid_dense), "lambda values.\n"))
+cat(paste("Lambda range:", 
+          format(min(lambda_grid_dense$lambda), scientific = FALSE), 
+          "to", 
+          max(lambda_grid_dense$lambda), "\n"))
 
-## 1. Coefficient Shrinkage Path
+# Ensure reproducibility
+set.seed(123)
+model_ridge <- caret::train(
+  medv ~ .,
+  data = trainData,
+  method = myRidgeModel,  # Our custom model interface
+  trControl = trControl,
+  tuneGrid = lambda_grid_dense
+)
 
-```{r ridge-path, fig.width=6, fig.height=4}
-library(glmnet)
-set.seed(42)
-X <- as.matrix(mtcars[, -1])
-y <- mtcars$mpg
-ridge <- glmnet(X, y, alpha = 0)
-plot(ridge, xvar = "lambda", label = TRUE)
+# Print the results
+print(model_ridge)
 ```
-*Interpretation:* As the penalty parameter λ increases, coefficients shrink toward zero, showing the effect of regularization.
 
-## 2. Cross-Validation Curve
-
-```{r ridge-viz-cv, fig.width=6, fig.height=4}
-cv_ridge <- cv.glmnet(X, y, alpha = 0)
-plot(cv_ridge)
+We can plot the RMSE across the range of `lambda` values (on a log scale) to find the optimal tuning parameter.
+```{r ridge-log, out.width="70%", fig.align='center'}
+plot(model_ridge, main = "RMSE vs. log(Lambda)",cex.main = 0.1)
 ```
-*Interpretation:* The vertical lines indicate the optimal λ values minimizing the cross-validation error. This helps choose a good tradeoff between bias and variance.
-
-## 3. Predicted vs Actual Values
-
-```{r ridge-pred, fig.width=6, fig.height=4}
-best_lambda <- cv_ridge$lambda.min
-ridge_best <- glmnet(X, y, alpha = 0, lambda = best_lambda)
-y_pred <- predict(ridge_best, X)
-plot(y, y_pred, pch = 19, col = "steelblue",
-     xlab = "Actual MPG", ylab = "Predicted MPG",
-     main = "Ridge Regression: Actual vs Predicted")
-abline(0, 1, col = "red", lty = 2)
+The best lambda value found during cross-validation is:
+```{r rr best lambda}
+cat(paste("Best lambda:", model_ridge$bestTune$lambda, "\n"))
+best_rmse_ridge <- min(model_ridge$results$RMSE)
+cat(paste("Corresponding RMSE:", best_rmse_ridge, "\n"))
 ```
-*Interpretation:* The closer the points are to the red diagonal line, the better the model fits the data.
+The output table and the RMSE vs. log(Lambda) plot reveal a ridge tuning pattern:  
+    --When `lambda` is extremely small (e.g., $10^{-4}$), the RMSE is 4.818679, which is identical to the standard Linear Model (model_lm). This is the correct behavior, as a penalty of (near) zero makes ridge regression equivalent to OLS.  
+    --As the penalty `lambda` increases, the CV RMSE slightly decreases. This indicates that applying a small amount of shrinkage (penalizing large coefficients) improves the model's predictive performance on unseen data by reducing variance.  
+    --The optimal model was found at `lambda = 4.037`, which achieved the minimum CV RMSE of 4.815.  
+    --As `lambda` continues to increase past this optimal point, the plot shows the RMSE rising again (e.g., 4.997 at lambda=100). This indicates underfitting, where the penalty is too strong and introduces excessive bias into the model.
+
+---
+
+# Final Model Evaluation on the Test Set
+
+We use the `testData` set, which the models have never seen before, to get an unbiased estimate of their real-world performance. We create a summary table comparing the Cross-Validation RMSE (from the training set) to the final RMSE on the test set.
+```{r final}
+# 1. Make predictions on the test set
+pred_lm <- predict(model_lm, testData)
+pred_fwd <- predict(model_fwd, testData)
+pred_ridge <- predict(model_ridge, testData)
+
+# 2. Get performance metrics on test set
+# postResample gives RMSE, Rsquared, and MAE
+res_lm <- postResample(pred = pred_lm, obs = testData$medv)
+res_fwd <- postResample(pred = pred_fwd, obs = testData$medv)
+res_ridge <- postResample(pred = pred_ridge, obs = testData$medv)
+
+# 3. Get the best CV RMSE from our previous models
+cv_rmse_lm <- model_lm$results$RMSE
+cv_rmse_fwd <- min(model_fwd$results$RMSE)
+cv_rmse_ridge <- min(model_ridge$results$RMSE)
+
+# 4. Combine into a summary data.frame
+summary_table <- data.frame(
+  "CV RMSE (Train)" = c(cv_rmse_lm, cv_rmse_fwd, cv_rmse_ridge),
+  "Test RMSE" = c(res_lm["RMSE"], res_fwd["RMSE"], res_ridge["RMSE"]),
+  "Test Rsquared" = c(res_lm["Rsquared"], res_fwd["Rsquared"], res_ridge["Rsquared"])
+)
+rownames(summary_table) <- c("Linear Model (LM)", "Forward Selection", "Ridge (liu.ridgereg)")
+
+# 5. Print the final comparison table
+cat("Final Model Performance Comparison:\n\n")
+print(summary_table, digits = 4)
+```
+**Concluding Comments:**  
+  --**Final Rankings**: The rankings on the test set are:  
+    1st: Forward Selection (Test RMSE = 4.561)  
+    2nd: Ridge (liu.ridgereg) (Test RMSE = 4.588)  
+    3rd: Linear Model (LM) (Test RMSE = 4.589)  
+  --**Conclusion**: The Forward Selection model has the best performance in cross-validation (CV RMSE 4.807) and this translated into the best performance on the final test set (Test RMSE 4.561).  
+  --**ridgereg Performance**: Our custom ridgereg function performed as intended. Its Test RMSE of 4.588 was an improvement, however slight, over the standard Linear Model's 4.589. This demonstrates that applying a small shrinkage penalty (lambda = 4.037) provided a small but real regularization benefit, improving the model's ability to generalize.  
+  --**CV vs. Test**: All three models performed better on the test set than their average CV RMSE from the training set. This suggests our 20% test split was, by chance, slightly easier to predict than the training folds. The most important finding is that the relative ranking of the models (Forward > Ridge > LM) remained consistent between training and testing, giving us high confidence in our model selection process.  
+  In summary, while the performance differences are small, our analysis shows that regularization (both via variable selection and L2 shrinkage) provided a measurable benefit for this dataset.
