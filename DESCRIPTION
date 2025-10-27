@@ -20,6 +20,7 @@ Encoding: UTF-8
 LazyData: true
 Suggests: 
     caret,
+    leaps,
     mlbench,
     knitr,
     rmarkdown,
