@@ -44,16 +44,32 @@ predict.ridgereg <- function(object, newdata = NULL, ...) {
       }
     }
   }
-
-  mf <- stats::model.frame(object$terms, data = newdata, na.action = stats::na.omit)
-  Xraw <- stats::model.matrix(object$terms, mf, contrasts.arg = NULL)
-
-  common_cols <- intersect(colnames(Xraw), object$coefnames)
-  Xraw <- Xraw[, common_cols, drop = FALSE]
-
-  yhat <- as.vector(Xraw %*% object$beta[match(colnames(Xraw), object$coefnames)])
-
-  return(yhat)
+  # commenting below content to fix predict.ridgereg method to handle missing
+  # response variables and improve error handling. The original implementation
+  # failed when `newdata` didn't include the response variable because `model.frame()`
+  # requires the response term. So we fix it by using `stats::delete.response()`
+  # to create terms without response variable requirement. Explicit validation
+  # for required predictor variables was also added.
+  # mf <- stats::model.frame(object$terms, data = newdata, na.action = stats::na.omit)
+  # Xraw <- stats::model.matrix(object$terms, mf, contrasts.arg = NULL)
+  #
+  # common_cols <- intersect(colnames(Xraw), object$coefnames)
+  # Xraw <- Xraw[, common_cols, drop = FALSE]
+  #
+  # yhat <- as.vector(Xraw %*% object$beta[match(colnames(Xraw), object$coefnames)])
+  #
+  # return(yhat)
+  terms <- stats::delete.response(object$terms)
+  X_new <- stats::model.matrix(terms, newdata, contrasts.arg = NULL)
+  model_coef_names <- object$coefnames
+  newdata_col_names <- colnames(X_new)
+  if (!all(model_coef_names %in% newdata_col_names)) {
+    missing <- setdiff(model_coef_names, newdata_col_names)
+    stop("Newdata is missing required variables: ", paste(missing, collapse = ", "))
+  }
+  X_new <- X_new[, model_coef_names, drop = FALSE]
+  predictions <- as.vector(X_new %*% object$beta)
+  return(predictions)
 }
 
 #' Summary method for ridgereg
